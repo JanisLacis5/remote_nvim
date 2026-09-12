@@ -8,3 +8,5 @@
     // read nvim events from /tmp/janisnvim.sock, process them and forward to the remote headless nvim server
     // receive events from nvim server and push them to the local nvim remote ui
 // }
+
+int main() {}
