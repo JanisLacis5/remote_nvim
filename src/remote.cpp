@@ -27,7 +27,7 @@
 #include <array>
 #include <string>
 
-int open_sock(const std::string& ip, uint16_t port) {
+int open_sock(uint32_t ip, uint16_t port) {
     auto fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         perror("socket");
@@ -37,11 +37,7 @@ int open_sock(const std::string& ip, uint16_t port) {
     sockaddr_in addr{};
     addr.sin_port = htons(port);
     addr.sin_family = AF_INET;
-    if (inet_pton(AF_INET, ip.data(), &addr.sin_addr) <= 0) {
-        perror("inet_pton");
-        return -1;
-    } 
-
+    addr.sin_addr.s_addr = htonl(ip);
     if (connect(fd, (sockaddr* )&addr, sizeof(addr)) < 0) {
         perror("connect");
         return -1;
@@ -66,16 +62,16 @@ int main() {
     }
 
     // todo: send a message that this is for control (open_ui and stuff)
-    auto ctrl_fd = open_sock("127.0.0.1", 7778);
+    auto ctrl_fd = open_sock(INADDR_LOOPBACK, 7778);
     if (ctrl_fd == -1)
         return -1;
 
     // todo: send a message that this is for data
-    auto data_fd = open_sock("127.0.0.1", 7778);
+    auto data_fd = open_sock(INADDR_LOOPBACK, 7778);
     if (ctrl_fd == -1)
         return -1;
 
-    auto nvim_fd = open_sock("127.0.0.1", 7780);
+    auto nvim_fd = open_sock(INADDR_LOOPBACK, 7780);
     if (nvim_fd == -1)
         return -1;
 
