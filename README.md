@@ -1,3 +1,4 @@
+# Workflow
 ```text
 +------------------------------------------------------------------+
 |                              REMOTE                              |
@@ -87,7 +88,7 @@
                      127.0.0.1:7780 Nvim
 ```
 
-Daemon data path:
+# Daemon data path:
 ```
 local Nvim UI
       |
@@ -108,7 +109,7 @@ remote janisnvim
 remote Nvim 127.0.0.1:7780
 ```
 
-Control path:
+# Control path:
 ```
 remote janisnvim
       |
@@ -122,3 +123,14 @@ janisnvimdaemon
       v
 OPEN_UI / future control messages
 ```
+
+# Dependencies:
+### Build:
+- CMake
+- GCC/Clang with C++26 support
+
+### Runtime (only linux supported):
+- OpenSSH
+- Neovim
+- tmux (for intended workflow)
+
