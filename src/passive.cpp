@@ -1,12 +1,35 @@
-// main for the pasive app that is called on the client 
+// janisnvimdaemon - runs on the client
+//
+// POC requirement:
+// The user connects to the remote machine with:
+//
+//   ssh -R 7778:127.0.0.1:7777 SERVER
+//
+// This makes remote 127.0.0.1:7778 forward to the local daemon
+// listening on 127.0.0.1:7777.
+//
 // main() {
-    // is started when ssh -R has been opened by the remote
-    // open `ssh -L 7778:127.0.0.1:7777 SERVER_USER@SERVER`. in the future, the port could be in the received packet
-    // start listening / reding /tmp/janisnvim.sock
-    // run `nvim --server /tmp/janisnvim.sock --remote-ui`
-    // connect(127.0.0.1:7778)
-    // read nvim events from /tmp/janisnvim.sock, process them and forward to the remote headless nvim server
-    // receive events from nvim server and push them to the local nvim remote ui
+//     // listen on 127.0.0.1:7777 for OPEN_UI requests
+//
+//     // receive OPEN_UI message containing:
+//     //   - remote host
+//     //   - remote Nvim RPC port
+//     //   - cwd / session metadata as needed
+//
+//     // establish a connection/tunnel to the remote Nvim server where
+//     // rpc commands will be forwarded from socket to this address:port
+//
+//     // create and listen on /tmp/janisnvim.sock
+//
+//     // run:
+//     //   nvim --server /tmp/janisnvim.sock --remote-ui
+//
+//     // accept the local Nvim UI connection and read all bytes from
+//     // the /tmp/janisnvim.sock and forward them to 127.0.0.1:7780
+//
+//     // proxy both directions:
+//     //   local Nvim UI -> process/intercept -> remote Nvim
+//     //   remote Nvim    -> process/intercept -> local Nvim UI
 // }
 
 int main() {}
