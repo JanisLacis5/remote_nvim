@@ -2,68 +2,123 @@
 +------------------------------------------------------------------+
 |                              REMOTE                              |
 |                                                                  |
-|  1) tmux session & work happens here                             |
+|  1) User connects with:                                          |
 |                                                                  |
-|  2) `janisnvim` is entered                                       |
+|       ssh -R 7778:127.0.0.1:7777 SERVER                         |
 |                                                                  |
-|       -> new nvim server is created at                           |
-|          127.0.0.1:7777                                          |
-|          (ssh -L needed)                                         |
+|     This creates a remote listener at 127.0.0.1:7778 which       |
+|     forwards back to the local janisnvimdaemon on :7777.         |
 |                                                                  |
-|       -> ssh -R is opened to the client                          |
+|  2) User enters `janisnvim` inside remote tmux                   |
 |                                                                  |
-|       -> OPEN_UI message is sent to the client                   |
+|       -> start remote headless Nvim server                       |
+|          127.0.0.1:7780                                          |
+|                                                                  |
+|       -> open CONTROL connection to 127.0.0.1:7778               |
+|          and identify it as CONTROL                              |
+|                                                                  |
+|       -> send OPEN_UI message over control connection            |
+|                                                                  |
+|       -> open DATA connection to 127.0.0.1:7778                  |
+|          and identify it as NVIM_DATA                            |
+|                                                                  |
+|       -> connect locally to remote Nvim at                       |
+|          127.0.0.1:7780                                          |
+|                                                                  |
+|       -> proxy: DATA connection <-> remote Nvim                  |
 |                                                                  |
 +------------------------------------------------------------------+
 
+
+                         one SSH connection
+                  multiplexing multiple channels
+                                |
+                                v
 
 +------------------------------------------------------------------+
 |                         ACTUAL CLIENT                            |
 |                                                                  |
-|  1) I sit at this machine                                        |
+|  1) janisnvimdaemon is running                                  |
+|     and listening on 127.0.0.1:7777                             |
 |                                                                  |
-|  2) When ssh -R connects, systemd starts a daemon                |
+|  2) ssh -R forwards remote connections here                     |
 |                                                                  |
-|       -> daemon opens a new terminal (in tmux session)           |
+|       -> daemon accept()s CONTROL connection                     |
 |                                                                  |
-|       -> terminal starts Neovim UI connected to the              |
-|          Neovim server on the remote host                        |
+|       -> daemon receives OPEN_UI                                 |
+|                                                                  |
+|       -> daemon accept()s NVIM_DATA connection                   |
+|                                                                  |
+|       -> daemon creates /tmp/janisnvim.sock                      |
+|                                                                  |
+|       -> daemon starts:                                          |
+|                                                                  |
+|          nvim --server /tmp/janisnvim.sock --remote-ui           |
+|                                                                  |
+|       -> local Nvim UI connects to /tmp/janisnvim.sock           |
 |                                                                  |
 |                                                                  |
 |                    +----------------------+                      |
 |                    |     Local Nvim UI    |                      |
 |                    +----------+-----------+                      |
 |                               |                                  |
+|                               | Unix socket                      |
 |                               | /tmp/janisnvim.sock              |
 |                               v                                  |
 |                    +----------------------+                      |
-|                    |   janisnvim daemon   |                      |
-|                    | / message processor  |                      |
-|                    +----------+-----------+                      |
-|                               |                                  |
-|                               | SSH / forwarded RPC              |
-|                               v                                  |
-+-------------------------------+----------------------------------+
+|                    |  janisnvimdaemon     |                      |
+|                    |  message processor   |                      |
+|                    +-----+----------+-----+                      |
+|                          |          |                            |
+|                    CONTROL fd   NVIM_DATA fd                     |
+|                          |          |                            |
++--------------------------|----------|----------------------------+
+                           |          |
+                           |          |
+                           v          v
+                    SSH channel 1   SSH channel 2
+                           |          |
+                           +----+-----+
                                 |
                                 v
-                       +------------------+
-                       | Remote Nvim      |
-                       | server           |
-                       +------------------+
+                         remote janisnvim
+                                |
+                                v
+                     127.0.0.1:7780 Nvim
 ```
 
-Daemon behavior:
+Daemon data path:
+```
+local Nvim UI
+      |
+      v
+/tmp/janisnvim.sock
+      |
+      v
+janisnvimdaemon
+      |
+      | NVIM_DATA connection
+      v
+SSH reverse-forwarded channel
+      |
+      v
+remote janisnvim
+      |
+      v
+remote Nvim 127.0.0.1:7780
+```
 
-    local Nvim UI
-          |
-          v
-    /tmp/janisnvim.sock
-          |
-          v
-    janisnvim daemon
-          |
-          +----> forwards UI/input messages ----> remote server
-          |
-          <---- receives redraw messages <-------+
-
-    daemon renders / forwards what the remote Nvim server sends
+Control path:
+```
+remote janisnvim
+      |
+      | CONTROL connection
+      v
+SSH reverse-forwarded channel
+      |
+      v
+janisnvimdaemon
+      |
+      v
+OPEN_UI / future control messages
+```
