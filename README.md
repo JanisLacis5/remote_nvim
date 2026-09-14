@@ -127,7 +127,7 @@ OPEN_UI / future control messages
 # Dependencies:
 ### Build:
 - CMake
-- GCC/Clang with C++26 support
+- GCC/Clang with C++23 support
 
 ### Runtime (only linux supported):
 - OpenSSH
