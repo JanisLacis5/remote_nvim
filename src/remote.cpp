@@ -27,24 +27,7 @@
 #include <array>
 #include <string>
 
-int open_sock(uint32_t ip, uint16_t port) {
-    auto fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-        perror("socket");
-        return -1;
-    }
-
-    sockaddr_in addr{};
-    addr.sin_port = htons(port);
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(ip);
-    if (connect(fd, (sockaddr* )&addr, sizeof(addr)) < 0) {
-        perror("connect");
-        return -1;
-    }
-
-    return fd;
-}
+#include "networking/socket.hpp"
 
 int main() {
     auto nvim_server_pid = fork();
@@ -61,18 +44,18 @@ int main() {
         return 0;
     }
 
-    // todo: send a message that this is for control (open_ui and stuff)
-    auto ctrl_fd = open_sock(INADDR_LOOPBACK, 7778);
-    if (ctrl_fd == -1)
+    networking::socket ctrl_sock{INADDR_LOOPBACK, 7778};
+    if (!ctrl_sock.is_valid())
         return -1;
+    ctrl_sock.write(networking::type_to_bytes(networking::sock_type::control), sizeof(networking::sock_type_underlying_t));
 
-    // todo: send a message that this is for data
-    auto data_fd = open_sock(INADDR_LOOPBACK, 7778);
-    if (ctrl_fd == -1)
+    networking::socket data_sock{INADDR_LOOPBACK, 7778};
+    if (!data_sock.is_valid())
         return -1;
+    data_sock.write(networking::type_to_bytes(networking::sock_type::data), sizeof(networking::sock_type_underlying_t));
 
-    auto nvim_fd = open_sock(INADDR_LOOPBACK, 7780);
-    if (nvim_fd == -1)
+    networking::socket nvim_sock{INADDR_LOOPBACK, 7780};
+    if (!nvim_sock.is_valid())
         return -1;
 
     // see `man waitpid` to replace NULL with status, process status afterwards

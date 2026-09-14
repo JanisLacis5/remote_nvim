@@ -32,74 +32,41 @@
 //     //   remote Nvim    -> process/intercept -> local Nvim UI
 // }
 
-#include <stdio.h>
 #include <sys/wait.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h> 
 
 #include <cstdlib>
 #include <iostream>
-#include <utility>
 
-// todo: make this available for remote as well
-enum class sock_type { bad, data, control };
-
-std::pair<int, sock_type> wait_sock(int listener_fd) {
-    auto fd = accept(listener_fd, nullptr, nullptr);
-    if (fd < 0) {
-        perror("accept");
-        return {-1, sock_type::bad};
-    }
-
-    // todo: wait for the message to arrive identifying what socket this is (data or control)
-    return {fd, sock_type::data};
-}
-
-bool set_fd(int& to_set, int new_val) {
-    if (to_set >= 0) {
-        std::cerr << "fd already initialized" << std::endl;
-        return false;
-    }
-
-    to_set = new_val;
-    return true;
-}
+#include "networking/socket.hpp"
+#include "networking/listener.hpp"
 
 int main() {
-    auto listener_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (listener_fd == -1) {
-        perror("socket");
-        return -1;
-    }
+    networking::listener listener{};
+    std::optional<networking::socket> ctrl_sock_optional;
+    std::optional<networking::socket> data_sock_optional;
 
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = htons(7777);
-
-    if (bind(listener_fd, (sockaddr *)&addr, sizeof(addr)) == -1) {
-        perror("bind");
-        close(listener_fd);
-        return -1;
-    }
-
-    if (listen(listener_fd, 10) == -1) {
-        perror("listen");
-        close(listener_fd);
-        return -1;
-    }
-
-    int ctrl_fd = -1;
-    int data_fd = -1;
     for (auto i = 0; i < 2; ++i) {
-        auto [fd, type] = wait_sock(listener_fd);
+        auto maybe_sock = listener.accept();
+        if (!maybe_sock.has_value())
+            return -1;
+
+        networking::socket& sock = maybe_sock.value();
+
+        auto response = sock.read(sizeof(networking::sock_type_underlying_t));
+        if (response.size() != sizeof(networking::sock_type_underlying_t)) {
+            std::cerr << "bad data, terminating" << std::endl;
+            return -1;
+        }
+
+        auto type = networking::bytes_to_type(response);
         switch (type) {
-        case sock_type::data:
-            set_fd(data_fd, fd);
+        case networking::sock_type::data:
+            data_sock_optional.emplace(std::move(sock));
             break;
-        case sock_type::control:
-            set_fd(ctrl_fd, fd);
+        case networking::sock_type::control:
+            ctrl_sock_optional.emplace(std::move(sock));
             break;
         default:
             std::cerr << "bad type" << std::endl;
@@ -107,8 +74,13 @@ int main() {
         }
     }
 
-    if (ctrl_fd < 0 || data_fd < 0) {
+    if (!ctrl_sock_optional.has_value() || !ctrl_sock_optional->is_valid() || 
+            !data_sock_optional.has_value() || data_sock_optional->is_valid()) {
         std::cerr << "missing control or data connection" << std::endl;
         return -1;
     }
+
+    auto& ctrl_sock = ctrl_sock_optional.value();
+    auto& data_sock = data_sock_optional.value();
+    // continue...
 }
