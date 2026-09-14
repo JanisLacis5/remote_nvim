@@ -18,12 +18,15 @@ public:
     listener(listener&& other) noexcept;
     listener& operator=(listener&& other) noexcept;
 
+    bool is_valid() const noexcept { return fd_ >= 0; };
     std::optional<networking::socket> accept();
 
 private:
     static constexpr int LISTEN_BACKLOG = 10;
 
     int fd_{-1};
+
+    void close();
 };
 
 }

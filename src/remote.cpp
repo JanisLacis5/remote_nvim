@@ -44,18 +44,24 @@ int main() {
         return 0;
     }
 
-    networking::socket ctrl_sock{INADDR_LOOPBACK, 7778};
+    networking::socket ctrl_sock{AF_INET, SOCK_STREAM};
     if (!ctrl_sock.is_valid())
         return -1;
-    ctrl_sock.write(networking::type_to_bytes(networking::sock_type::control), sizeof(networking::sock_type_underlying_t));
+    if (!ctrl_sock.connect(INADDR_LOOPBACK, 7778))
+        return -1;
+    ctrl_sock.write_all({ networking::type_to_byte(networking::sock_type::control) });
 
-    networking::socket data_sock{INADDR_LOOPBACK, 7778};
+    networking::socket data_sock{AF_INET, SOCK_STREAM};
     if (!data_sock.is_valid())
         return -1;
-    data_sock.write(networking::type_to_bytes(networking::sock_type::data), sizeof(networking::sock_type_underlying_t));
+    if (!data_sock.connect(INADDR_LOOPBACK, 7778))
+        return -1;
+    data_sock.write_all({ networking::type_to_byte(networking::sock_type::data) });
 
-    networking::socket nvim_sock{INADDR_LOOPBACK, 7780};
+    networking::socket nvim_sock{AF_INET, SOCK_STREAM};
     if (!nvim_sock.is_valid())
+        return -1;
+    if (!nvim_sock.connect(INADDR_LOOPBACK, 7778))
         return -1;
 
     // see `man waitpid` to replace NULL with status, process status afterwards

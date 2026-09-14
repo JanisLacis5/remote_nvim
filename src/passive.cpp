@@ -60,7 +60,7 @@ int main() {
             return -1;
         }
 
-        auto type = networking::bytes_to_type(response);
+        auto type = networking::byte_to_type(response[0]);
         switch (type) {
         case networking::sock_type::data:
             data_sock_optional.emplace(std::move(sock));

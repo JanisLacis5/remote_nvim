@@ -9,29 +9,17 @@
 
 namespace networking {
 
+// todo: make a protocol lib and move sock_type and related stuff there
 enum class sock_type : std::uint8_t { bad, no_type, data, control };
 using sock_type_underlying_t = std::underlying_type_t<sock_type>;
+static_assert(sizeof(sock_type_underlying_t) == 1);
 
-constexpr std::vector<std::byte> type_to_bytes(sock_type type) {
-    std::vector<std::byte> bytes{sizeof(sock_type_underlying_t)};
-
-    auto type_under = htonl(std::to_underlying(type));
-    auto it = bytes.begin();
-    while (type_under > 0) {
-        *it++ = static_cast<std::byte>(type_under & 0xFF);
-        type_under >>= 8;
-    }
-
-    return bytes;
-};
-constexpr sock_type bytes_to_type(std::vector<std::byte> bytes) {
-    // expected that data in big endian is sent through the socket
-    sock_type_underlying_t raw{};
-    for (const auto byte : bytes) {
-        raw = (raw << 8) | std::to_integer<sock_type_underlying_t>(byte);
-    }
-
-    return static_cast<networking::sock_type>(ntohl(raw));
+constexpr std::byte type_to_byte(sock_type type) {
+    return static_cast<std::byte>(std::to_underlying(type));
+}
+constexpr sock_type byte_to_type(std::byte byte) {
+    auto integral = static_cast<sock_type_underlying_t>(byte);
+    return static_cast<networking::sock_type>(integral);
 };
 
 class socket
@@ -49,14 +37,20 @@ public:
     bool is_valid() const noexcept { return fd_ >= 0; };
 
     bool bind(std::uint32_t addr, std::uint16_t port);
+    bool connect(std::uint32_t addr, std::uint16_t port);
+    // todo: make read_all and read_exact functions
     std::vector<std::byte> read(std::size_t min_cnt);
-    std::size_t write(const std::vector<std::byte>& payload, std::size_t min_cnt);
+    std::size_t write_all(const std::vector<std::byte>& payload);
 
 private:
     int fd_{-1};
-    int sock_family_;
-    int sock_type_;
-    int sock_protocol_;
+    int sock_family_{};
+    int sock_type_{};
+    int sock_protocol_{};
+
+    // todo: this only supports AF_INET, make this more universal
+    sockaddr_in create_sockaddr_in(std::uint32_t addr, std::uint16_t port);
+    void close();
 };
 
 }
