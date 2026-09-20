@@ -29,6 +29,7 @@
 #include <string>
 
 #include "networking/socket.hpp"
+#include "protocol/proto.hpp"
 
 int main() {
     auto nvim_server_pid = fork();
@@ -72,6 +73,18 @@ int main() {
         return -1;
     if (!nvim_sock.connect(INADDR_LOOPBACK, 7778))
         return -1;
+
+    auto message = proto::encode(proto::open_ui_message{
+        .payload{
+            .port = 7777,
+            .cwd = ""
+        }
+    });
+    written = ctrl_sock.write_all(message);
+    if (written != message.size) {
+        std::cerr << "written does not match the size" << std::endl;
+        return -1;
+    }
 
     // see `man waitpid` to replace NULL with status, process status afterwards
     waitpid(nvim_server_pid, NULL, 0);

@@ -8,6 +8,8 @@
 #include <vector>
 #include <span>
 
+#include "protocol/proto.hpp"
+
 namespace networking {
 
 // todo: make a protocol lib and move sock_type and related stuff there
@@ -42,7 +44,10 @@ public:
     // todo: make read_all and read_exact functions
     std::vector<std::byte> read(std::size_t len);
     std::vector<std::byte> read_all();
-    std::size_t write_all(std::span<std::byte> payload);
+    std::size_t write_all(const std::span<std::byte> payload);
+    std::size_t write_all(const proto::encoded_message& message) {
+        return write_all({ message.content, message.size });
+    }
 
 private:
     int fd_{-1};

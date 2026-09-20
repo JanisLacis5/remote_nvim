@@ -17,6 +17,7 @@ add_library(networking
 target_link_libraries(networking
     PUBLIC
         sanitizer_flags
+        protocol
 )
 
 target_include_directories(networking

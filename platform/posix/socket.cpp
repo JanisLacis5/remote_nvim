@@ -108,7 +108,7 @@ std::vector<std::byte> socket::read_all() {
     return {buf.begin(), buf.begin() + n_read};
 }
 
-std::size_t socket::write_all(std::span<std::byte> payload) {
+std::size_t socket::write_all(const std::span<std::byte> payload) {
     if (!is_valid())
         return {};
 

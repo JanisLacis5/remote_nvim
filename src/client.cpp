@@ -90,6 +90,11 @@ int main() {
 
     auto& ctrl_sock = ctrl_sock_optional.value();
     auto& data_sock = data_sock_optional.value();
-    std::cout << "end..." << std::endl;
-    // continue...
+
+    // wait for openui message
+
+    // open nvim ui and link it to /tmp/janisnvim.sock
+
+    /* accept the local Nvim UI connection and read all bytes from
+        the /tmp/janisnvim.sock and forward them to 127.0.0.1:7780 */
 }

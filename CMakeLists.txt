@@ -65,21 +65,24 @@ elseif(NOT SANITIZER STREQUAL "none")
 endif()
 
 add_subdirectory(networking)
+add_subdirectory(protocol)
 
 add_executable(janisnvim
-    src/remote.cpp
+    src/server.cpp
 )
 
 target_link_libraries(janisnvim
     PRIVATE
         networking
+        protocol
 )
 
 add_executable(janisnvimdaemon
-    src/passive.cpp
+    src/client.cpp
 )
 
 target_link_libraries(janisnvimdaemon
     PRIVATE
         networking
+        protocol
 )
