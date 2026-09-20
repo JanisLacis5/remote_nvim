@@ -40,6 +40,7 @@ static constexpr std::size_t HEADER_SIZE = 1;
 template <typename Payload>
 struct message_header {
     static constexpr auto msg_type = message_type<Payload>::value;
+    std::uint32_t payload_size;
 };
 
 template <typename Payload>
@@ -60,8 +61,8 @@ struct encoded_message {
     std::size_t size{};
 };
 
-constexpr generic_message decode(const std::span<std::byte> incoming);
-constexpr generic_message decode_payload(const open_ui_payload& payload);
+constexpr generic_message decode(std::span<const std::byte> incoming);
+constexpr open_ui_message decode_open_ui(std::span<const std::byte> incoming);
 constexpr encoded_message encode_payload(const open_ui_payload& payload);
 
 template <typename Payload>
