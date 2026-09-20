@@ -92,6 +92,12 @@ int main() {
     auto& data_sock = data_sock_optional.value();
 
     // wait for openui message
+    auto message = ctrl_sock.read(5 + 2 + 25);
+    auto decoded = proto::decode(message);
+    if (auto* open = std::get_if<proto::open_ui_message>(&decoded)) {
+        // open is proto::open_ui_message*
+        std::cout << open->payload.cwd;
+    }
 
     // open nvim ui and link it to /tmp/janisnvim.sock
 

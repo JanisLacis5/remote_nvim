@@ -77,7 +77,7 @@ int main() {
     auto message = proto::encode(proto::open_ui_message{
         .payload{
             .port = 7777,
-            .cwd = ""
+            .cwd = "/janis/laics/ir/forsakais"
         }
     });
     written = ctrl_sock.write_all(message);

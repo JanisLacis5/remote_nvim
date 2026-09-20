@@ -90,24 +90,6 @@ std::vector<std::byte> socket::read(std::size_t len) {
     return {buf.begin(), buf.begin() + n_read};
 }
 
-std::vector<std::byte> socket::read_all() {
-    if (!is_valid())
-        return {};
-
-    constexpr std::size_t buf_size = 4096;
-    std::array<std::byte, buf_size> buf{};
-
-    int total_read{};
-    int n_read{};
-    while ((n_read = ::read(fd_, buf.data() + total_read, buf_size - total_read)) > 0) {
-        total_read += n_read;
-    }
-
-    if (n_read == 0)
-        return {};
-    return {buf.begin(), buf.begin() + n_read};
-}
-
 std::size_t socket::write_all(const std::span<std::byte> payload) {
     if (!is_valid())
         return {};

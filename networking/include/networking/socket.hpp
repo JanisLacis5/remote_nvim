@@ -41,10 +41,9 @@ public:
 
     bool bind(std::uint32_t addr, std::uint16_t port);
     bool connect(std::uint32_t addr, std::uint16_t port);
-    // todo: make read_all and read_exact functions
     std::vector<std::byte> read(std::size_t len);
-    std::vector<std::byte> read_all();
     std::size_t write_all(const std::span<std::byte> payload);
+    // todo: make a seperate class for protocol connection
     std::size_t write_all(const proto::encoded_message& message) {
         return write_all({ message.content, message.size });
     }
