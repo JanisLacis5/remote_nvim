@@ -1,8 +1,13 @@
 #ifndef PROTO_H
 #define PROTO_H
 
+#include <arpa/inet.h>
+
+#include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <variant>
+#include <utility>
 #include <string>
 #include <array>
 #include <span>
@@ -31,10 +36,10 @@ struct message_type<open_ui_payload> {
 };
 
 // MESSAGE ITSELF
+static constexpr std::size_t HEADER_SIZE = 1;
 template <typename Payload>
 struct message_header {
     static constexpr auto msg_type = message_type<Payload>::value;
-    std::size_t payload_len;
 };
 
 template <typename Payload>
@@ -55,11 +60,39 @@ struct encoded_message {
     std::size_t size{};
 };
 
-generic_message decode(const std::span<std::byte> incoming);
+constexpr generic_message decode(const std::span<std::byte> incoming);
+constexpr generic_message decode_payload(const open_ui_payload& payload);
+constexpr encoded_message encode_payload(const open_ui_payload& payload);
 
 template <typename Payload>
-encoded_message encode(const message<Payload>& message) {
-    return {};
+constexpr encoded_message encode(const message<Payload>& message) {
+    encoded_message result;
+    auto& content = result.content;
+    auto& size = result.size;
+
+    auto type = std::to_underlying(message.hdr.msg_type);
+    content[size++] = static_cast<std::byte>(type);
+
+    auto payload = encode_payload(message.payload);
+    auto payload_size = htonl(static_cast<std::uint32_t>(payload.size));
+    if (payload.size + HEADER_SIZE > MAX_MESSAGE_LEN)
+        return {};
+
+    std::memcpy(
+        content.data() + size,
+        &payload_size,
+        sizeof(payload_size)
+    );
+    size += sizeof(payload_size);
+
+    std::copy_n(
+        payload.content.begin(),
+        payload.size,
+        content.begin() + size
+    );
+    size += payload.size;
+
+    return result;
 }
 
 }
