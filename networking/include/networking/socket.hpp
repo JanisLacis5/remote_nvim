@@ -48,8 +48,6 @@ private:
     int sock_type_{};
     int sock_protocol_{};
 
-    // todo: this only supports AF_INET, make this more universal
-    sockaddr_in create_sockaddr_in(std::uint32_t addr, std::uint16_t port);
     void close();
 };
 
