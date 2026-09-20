@@ -7,6 +7,34 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(PLATFORM "" CACHE STRING "Target platform: linux, mac, or windows")
+set_property(CACHE PLATFORM PROPERTY STRINGS linux mac windows)
+
+if(PLATFORM STREQUAL "")
+    if(WIN32)
+        set(PLATFORM "windows")
+    elseif(APPLE)
+        set(PLATFORM "mac")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(PLATFORM "linux")
+    else()
+        message(FATAL_ERROR
+            "Could not infer the target platform. Set PLATFORM to linux, mac, or windows."
+        )
+    endif()
+endif()
+
+string(TOLOWER "${PLATFORM}" PLATFORM)
+set(PLATFORM "${PLATFORM}" CACHE STRING "Target platform: linux, mac, or windows" FORCE)
+
+if(NOT PLATFORM MATCHES "^(linux|mac|windows)$")
+    message(FATAL_ERROR
+        "Unknown PLATFORM '${PLATFORM}'. Expected linux, mac, or windows."
+    )
+endif()
+
+message(STATUS "Target platform: ${PLATFORM}")
+
 set(SANITIZER "none" CACHE STRING "Sanitizer for Debug builds: none, address, thread")
 set_property(CACHE SANITIZER PROPERTY STRINGS none address thread)
 
