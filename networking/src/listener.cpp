@@ -4,15 +4,26 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include <iostream>
 #include <utility>
 #include <cerrno>
+#include <cstring>
 
 namespace networking {
 
 listener::listener() {
     fd_ = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    if (fd_ < 0) [[ unlikely ]]
+    if (fd_ < 0) [[ unlikely ]] {
+        std::cerr << "socket err, errno: " << std::strerror(errno) << std::endl;
         return;
+    }
+
+    int yes = 1;
+    auto setsockopt_err = ::setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    if (setsockopt_err) [[ unlikely ]] {
+        std::cerr << "setsockopt err, errno: " << std::strerror(errno) << std::endl;
+        return;
+    }
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
@@ -21,12 +32,14 @@ listener::listener() {
 
     auto bind_err = ::bind(fd_, (sockaddr *)&addr, sizeof(addr));
     if (bind_err) [[ unlikely ]] {
+        std::cerr << "bind err, errno: " << std::strerror(errno) << std::endl;
         close();
         return;
     }
 
     auto listen_err = ::listen(fd_, LISTEN_BACKLOG);
     if (listen_err) [[ unlikely ]] {
+        std::cerr << "listener err, errno: " << std::strerror(errno) << std::endl;
         close();
         return;
     }

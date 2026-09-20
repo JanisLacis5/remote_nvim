@@ -24,6 +24,7 @@
 #include <arpa/inet.h> 
 
 #include <cstdlib>
+#include <iostream>
 #include <array>
 #include <string>
 
@@ -49,14 +50,22 @@ int main() {
         return -1;
     if (!ctrl_sock.connect(INADDR_LOOPBACK, 7778))
         return -1;
-    ctrl_sock.write_all({ networking::type_to_byte(networking::sock_type::control) });
+
+    std::array<std::byte, 1> payload{ networking::type_to_byte(networking::sock_type::control) };
+    auto written = ctrl_sock.write_all(payload);
+    if (written != payload.size())
+        return -1;
 
     networking::socket data_sock{AF_INET, SOCK_STREAM};
     if (!data_sock.is_valid())
         return -1;
     if (!data_sock.connect(INADDR_LOOPBACK, 7778))
         return -1;
-    data_sock.write_all({ networking::type_to_byte(networking::sock_type::data) });
+
+    payload[0] = networking::type_to_byte(networking::sock_type::data);
+    written = data_sock.write_all(payload);
+    if (written != payload.size())
+        return -1;
 
     networking::socket nvim_sock{AF_INET, SOCK_STREAM};
     if (!nvim_sock.is_valid())

@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 
 #include <cerrno>
+#include <array>
 
 namespace {
     
@@ -70,19 +71,58 @@ bool socket::connect(std::uint32_t addr, std::uint16_t port) {
     return ::connect(fd_, (sockaddr* )&addr_in, sizeof(addr_in)) != -1;
 }
 
-std::vector<std::byte> socket::read(std::size_t min_cnt) {
+std::vector<std::byte> socket::read(std::size_t len) {
     if (!is_valid())
         return {};
 
-    return {};
+    constexpr std::size_t buf_size = 4096;
+    std::array<std::byte, buf_size> buf{};
+
+    int total_read{};
+    int n_read{};
+    while (total_read < len && 
+            (n_read = ::read(fd_, buf.data() + total_read, buf_size - total_read)) > 0) {
+        total_read += n_read;
+    }
+
+    if (n_read != len)
+        return {};
+    return {buf.begin(), buf.begin() + n_read};
 }
 
-std::size_t socket::write_all(const std::vector<std::byte>& payload) {
+std::vector<std::byte> socket::read_all() {
     if (!is_valid())
         return {};
-    return {};
+
+    constexpr std::size_t buf_size = 4096;
+    std::array<std::byte, buf_size> buf{};
+
+    int total_read{};
+    int n_read{};
+    while ((n_read = ::read(fd_, buf.data() + total_read, buf_size - total_read)) > 0) {
+        total_read += n_read;
+    }
+
+    if (n_read == 0)
+        return {};
+    return {buf.begin(), buf.begin() + n_read};
 }
 
+std::size_t socket::write_all(std::span<std::byte> payload) {
+    if (!is_valid())
+        return {};
+
+    ssize_t written = ::write(fd_, payload.data(), payload.size());
+    while (written < payload.size()) {
+        auto tmp = ::write(fd_, payload.data() + written, payload.size() - written);
+        if (tmp <= 0)
+            break;
+
+        written += tmp;
+    }
+
+    return written;
+}
 
 void socket::close() {
     if (is_valid()) {

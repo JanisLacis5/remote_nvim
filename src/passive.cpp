@@ -44,6 +44,11 @@
 
 int main() {
     networking::listener listener{};
+    if (!listener.is_valid()) {
+        std::cerr << "listener invalid, terminating" << std::endl;
+        return -1;
+    }
+
     std::optional<networking::socket> ctrl_sock_optional;
     std::optional<networking::socket> data_sock_optional;
 
@@ -52,10 +57,9 @@ int main() {
         if (!maybe_sock.has_value())
             return -1;
 
-        networking::socket& sock = maybe_sock.value();
-
-        auto response = sock.read(sizeof(networking::sock_type_underlying_t));
-        if (response.size() != sizeof(networking::sock_type_underlying_t)) {
+        auto& sock = maybe_sock.value();
+        auto response = sock.read(1);
+        if (response.size() != 1) {
             std::cerr << "bad data, terminating" << std::endl;
             return -1;
         }
@@ -74,13 +78,18 @@ int main() {
         }
     }
 
-    if (!ctrl_sock_optional.has_value() || !ctrl_sock_optional->is_valid() || 
-            !data_sock_optional.has_value() || data_sock_optional->is_valid()) {
-        std::cerr << "missing control or data connection" << std::endl;
+    if (!ctrl_sock_optional.has_value() || !data_sock_optional.has_value()) {
+        std::cerr << "control on data connections missing values" << std::endl;
+        return -1;
+    }
+
+    if (!ctrl_sock_optional->is_valid() || !data_sock_optional->is_valid()) {
+        std::cerr << "control or data connections invalid" << std::endl;
         return -1;
     }
 
     auto& ctrl_sock = ctrl_sock_optional.value();
     auto& data_sock = data_sock_optional.value();
+    std::cout << "end..." << std::endl;
     // continue...
 }

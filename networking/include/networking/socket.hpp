@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <utility>
 #include <vector>
+#include <span>
 
 namespace networking {
 
@@ -39,8 +40,9 @@ public:
     bool bind(std::uint32_t addr, std::uint16_t port);
     bool connect(std::uint32_t addr, std::uint16_t port);
     // todo: make read_all and read_exact functions
-    std::vector<std::byte> read(std::size_t min_cnt);
-    std::size_t write_all(const std::vector<std::byte>& payload);
+    std::vector<std::byte> read(std::size_t len);
+    std::vector<std::byte> read_all();
+    std::size_t write_all(std::span<std::byte> payload);
 
 private:
     int fd_{-1};
