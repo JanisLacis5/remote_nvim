@@ -66,6 +66,7 @@ endif()
 
 add_subdirectory(networking)
 add_subdirectory(protocol)
+add_subdirectory(os_internals)
 
 add_executable(janisnvim
     src/server.cpp
@@ -75,6 +76,7 @@ target_link_libraries(janisnvim
     PRIVATE
         networking
         protocol
+        os
 )
 
 add_executable(janisnvimdaemon
