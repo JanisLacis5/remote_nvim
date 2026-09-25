@@ -44,8 +44,8 @@ public:
     std::vector<std::byte> read(std::size_t len);
     std::size_t write_all(const std::span<std::byte> payload);
     // todo: make a seperate class for protocol connection
-    std::size_t write_all(const proto::encoded_message& message) {
-        return write_all({ message.content, message.size });
+    std::size_t write_all(proto::encoded_message& message) {
+        return write_all(std::span<std::byte>{message.content.data(), message.size});
     }
 
 private:

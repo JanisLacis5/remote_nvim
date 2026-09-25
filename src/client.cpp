@@ -59,8 +59,8 @@ int main() {
 
         auto& sock = maybe_sock.value();
         auto response = sock.read(1);
-        if (response.size() != 1) {
-            std::cerr << "bad data, terminating" << std::endl;
+        if (response.empty()) {
+            std::cerr << "bad data (received " << response.size() << " bytes, expected: 1, terminating" << std::endl;
             return -1;
         }
 
@@ -93,10 +93,15 @@ int main() {
 
     // wait for openui message
     auto message = ctrl_sock.read(5 + 2 + 25);
+    if (message.empty()) {
+        std::cerr << "Received message empty or bad" << std::endl;
+        return -1;
+    }
+
     auto decoded = proto::decode(message);
     if (auto* open = std::get_if<proto::open_ui_message>(&decoded)) {
         // open is proto::open_ui_message*
-        std::cout << open->payload.cwd;
+        std::cout << open->payload.cwd << std::endl;
     }
 
     // open nvim ui and link it to /tmp/janisnvim.sock

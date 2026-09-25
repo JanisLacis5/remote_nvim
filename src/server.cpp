@@ -47,32 +47,48 @@ int main() {
     }
 
     networking::socket ctrl_sock{AF_INET, SOCK_STREAM};
-    if (!ctrl_sock.is_valid())
+    if (!ctrl_sock.is_valid()) {
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
-    if (!ctrl_sock.connect(INADDR_LOOPBACK, 7778))
+    }
+    if (!ctrl_sock.connect(INADDR_LOOPBACK, 7778)) {
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
+    }
 
     std::array<std::byte, 1> payload{ networking::type_to_byte(networking::sock_type::control) };
     auto written = ctrl_sock.write_all(payload);
-    if (written != payload.size())
+    if (written != payload.size()) {
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
+    }
 
     networking::socket data_sock{AF_INET, SOCK_STREAM};
-    if (!data_sock.is_valid())
+    if (!data_sock.is_valid()) {
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
-    if (!data_sock.connect(INADDR_LOOPBACK, 7778))
+    }
+    if (!data_sock.connect(INADDR_LOOPBACK, 7778)) {
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
+    }
 
     payload[0] = networking::type_to_byte(networking::sock_type::data);
     written = data_sock.write_all(payload);
-    if (written != payload.size())
+    if (written != payload.size()) {
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
+    }
 
     networking::socket nvim_sock{AF_INET, SOCK_STREAM};
-    if (!nvim_sock.is_valid())
+    if (!nvim_sock.is_valid()) {
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
-    if (!nvim_sock.connect(INADDR_LOOPBACK, 7778))
+    }
+    if (!nvim_sock.connect(INADDR_LOOPBACK, 7778)) {
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
+    }
 
     auto message = proto::encode(proto::open_ui_message{
         .payload{
@@ -83,6 +99,7 @@ int main() {
     written = ctrl_sock.write_all(message);
     if (written != message.size) {
         std::cerr << "written does not match the size" << std::endl;
+        waitpid(nvim_server_pid, NULL, 0);
         return -1;
     }
 

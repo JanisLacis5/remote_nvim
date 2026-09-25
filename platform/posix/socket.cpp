@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include <iostream>
 #include <cerrno>
 #include <array>
 
@@ -81,11 +82,11 @@ std::vector<std::byte> socket::read(std::size_t len) {
     int total_read{};
     int n_read{};
     while (total_read < len && 
-            (n_read = ::read(fd_, buf.data() + total_read, buf_size - total_read)) > 0) {
+            (n_read = ::read(fd_, buf.data() + total_read, len - total_read)) > 0) {
         total_read += n_read;
     }
 
-    if (n_read != len)
+    if (total_read != len)
         return {};
     return {buf.begin(), buf.begin() + n_read};
 }
