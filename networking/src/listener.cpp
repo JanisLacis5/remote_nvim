@@ -11,7 +11,7 @@
 
 namespace networking {
 
-listener::listener() {
+listener::listener(std::uint16_t port) {
     fd_ = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd_ < 0) [[ unlikely ]] {
         std::cerr << "socket err, errno: " << std::strerror(errno) << std::endl;
@@ -22,13 +22,14 @@ listener::listener() {
     auto setsockopt_err = ::setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
     if (setsockopt_err) [[ unlikely ]] {
         std::cerr << "setsockopt err, errno: " << std::strerror(errno) << std::endl;
+        close();
         return;
     }
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = htons(7777);
+    addr.sin_port = htons(port);
 
     auto bind_err = ::bind(fd_, (sockaddr *)&addr, sizeof(addr));
     if (bind_err) [[ unlikely ]] {
@@ -54,6 +55,14 @@ std::optional<networking::socket> listener::accept() {
         return {};
 
     return networking::socket{fd};
+}
+
+std::uint16_t listener::port() const noexcept {
+    sockaddr_in addr{};
+    socklen_t size = sizeof(addr);
+    if (::getsockname(fd_, reinterpret_cast<sockaddr*>(&addr), &size) < 0)
+        return 0;
+    return ntohs(addr.sin_port);
 }
 
 listener::~listener() {
