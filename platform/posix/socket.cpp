@@ -4,7 +4,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include <iostream>
 #include <cerrno>
 #include <array>
 
@@ -93,7 +92,7 @@ std::vector<std::byte> socket::read(std::size_t len) {
 
 std::size_t socket::write_all(const std::span<std::byte> payload) {
     if (!is_valid())
-        return {};
+        return 0;
 
     ssize_t written = ::write(fd_, payload.data(), payload.size());
     while (written < payload.size()) {

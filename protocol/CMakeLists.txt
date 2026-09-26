@@ -1,11 +1,14 @@
-add_library(protocol INTERFACE)
+add_library(protocol
+    src/message_handler.cpp
+)
 
 target_link_libraries(protocol
-    INTERFACE
+    PUBLIC
+        networking
         sanitizer_flags
 )
 
 target_include_directories(protocol
-    INTERFACE
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

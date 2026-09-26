@@ -1,5 +1,6 @@
 #include "os/process.hpp"
 
+#include <filesystem>
 #include <sys/wait.h>
 
 #include <vector>
@@ -19,4 +20,9 @@ process::process(std::initializer_list<std::string> raw_args) {
 process::~process() {
     // see `man waitpid` to replace NULL with status, process the status afterwards
     waitpid(pid_, NULL, 0);
+}
+
+std::filesystem::path process::cwd() {
+    std::filesystem::path path = std::filesystem::current_path().root_path() / "proc" / std::to_string(pid_) / "cwd";
+    return std::filesystem::read_symlink(path);
 }

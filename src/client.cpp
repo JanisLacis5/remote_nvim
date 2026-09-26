@@ -41,6 +41,7 @@
 
 #include "networking/socket.hpp"
 #include "networking/listener.hpp"
+#include "protocol/proto.hpp"
 
 int main() {
     networking::listener listener{};
@@ -57,20 +58,18 @@ int main() {
         if (!maybe_sock.has_value())
             return -1;
 
-        auto& sock = maybe_sock.value();
-        auto response = sock.read(1);
-        if (response.empty()) {
-            std::cerr << "bad data (received " << response.size() << " bytes, expected: 1, terminating" << std::endl;
+        proto::message_handler tmp_msg_hanlder{std::move(maybe_sock.value())};
+        auto response = tmp_msg_hanlder.read_msg();
+        auto* type_msg = std::get_if<proto::tell_sck_type_message>(&response);
+        if (!type_msg)
             return -1;
-        }
 
-        auto type = networking::byte_to_type(response[0]);
-        switch (type) {
+        switch (type_msg->payload.type) {
         case networking::sock_type::data:
-            data_sock_optional.emplace(std::move(sock));
+            data_sock_optional.emplace(std::move(tmp_msg_hanlder.release_socket()));
             break;
         case networking::sock_type::control:
-            ctrl_sock_optional.emplace(std::move(sock));
+            ctrl_sock_optional.emplace(std::move(tmp_msg_hanlder.release_socket()));
             break;
         default:
             std::cerr << "bad type" << std::endl;
@@ -78,29 +77,12 @@ int main() {
         }
     }
 
-    if (!ctrl_sock_optional.has_value() || !data_sock_optional.has_value()) {
-        std::cerr << "control on data connections missing values" << std::endl;
-        return -1;
-    }
+    proto::message_handler ctrl_msg_handler{std::move(ctrl_sock_optional.value())};
+    proto::message_handler data_msg_handler{std::move(data_sock_optional.value())};
 
-    if (!ctrl_sock_optional->is_valid() || !data_sock_optional->is_valid()) {
-        std::cerr << "control or data connections invalid" << std::endl;
-        return -1;
-    }
-
-    auto& ctrl_sock = ctrl_sock_optional.value();
-    auto& data_sock = data_sock_optional.value();
-
-    // wait for openui message
-    auto message = ctrl_sock.read(5 + 2 + 25);
-    if (message.empty()) {
-        std::cerr << "Received message empty or bad" << std::endl;
-        return -1;
-    }
-
-    auto decoded = proto::decode(message);
-    if (auto* open = std::get_if<proto::open_ui_message>(&decoded)) {
-        // open is proto::open_ui_message*
+    // get openui message
+    auto message = ctrl_msg_handler.read_msg();
+    if (auto* open = std::get_if<proto::open_ui_message>(&message)) {
         std::cout << open->payload.cwd << std::endl;
     }
 
