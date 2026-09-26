@@ -16,7 +16,6 @@ add_library(os
 target_link_libraries(os
     PUBLIC
         sanitizer_flags
-        protocol
 )
 
 target_include_directories(os

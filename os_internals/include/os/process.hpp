@@ -12,10 +12,15 @@ public:
     process(std::initializer_list<std::string> raw_args);
     ~process();
 
+    process(const process&) = delete;
+    process& operator=(const process&) = delete;
+    process(process&& other) noexcept;
+    process& operator=(process&& other) noexcept;
+
     std::filesystem::path cwd();
 
 private:
-    int pid_{};
+    int pid_{-1};
 };
 
 #endif

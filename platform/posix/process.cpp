@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 
 #include <vector>
+#include <utility>
 
 process::process(std::initializer_list<std::string> raw_args) {
     std::vector<std::string> args{raw_args};
@@ -20,6 +21,15 @@ process::process(std::initializer_list<std::string> raw_args) {
 process::~process() {
     // see `man waitpid` to replace NULL with status, process the status afterwards
     waitpid(pid_, NULL, 0);
+}
+
+process::process(process&& other) noexcept 
+    : pid_{std::exchange(other.pid_, -1)}
+{}
+
+process& process::operator=(process&& other) noexcept {
+    pid_ = std::exchange(other.pid_, -1);
+    return *this;
 }
 
 std::filesystem::path process::cwd() {
