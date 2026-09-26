@@ -88,3 +88,8 @@ target_link_libraries(janisnvimdaemon
         networking
         protocol
 )
+
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

@@ -16,7 +16,7 @@ endif
 PLATFORM ?= $(DEFAULT_PLATFORM)
 BUILD_ROOT := build/$(PLATFORM)
 
-.PHONY: release debug debugaddr debugthread linux mac windows clean
+.PHONY: release debug debugaddr debugthread test testaddr linux mac windows clean
 
 release:
 	cmake -B $(BUILD_ROOT)/release \
@@ -48,6 +48,12 @@ debugthread:
 
 linux mac windows:
 	$(MAKE) release PLATFORM=$@
+
+test: debug
+	ctest --test-dir $(BUILD_ROOT)/debug --output-on-failure $(CTEST_ARGS)
+
+testaddr: debugaddr
+	ctest --test-dir $(BUILD_ROOT)/debugaddr --output-on-failure $(CTEST_ARGS)
 
 clean:
 	rm -rf build

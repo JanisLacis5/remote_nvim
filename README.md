@@ -134,3 +134,16 @@ OPEN_UI / future control messages
 - Neovim
 - tmux (for intended workflow)
 
+# Tests
+
+See [tests/README.md](tests/README.md) for details.
+Build:
+
+```sh
+cmake -S . -B build/linux/tests -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/linux/tests --parallel
+ctest --test-dir build/linux/tests --output-on-failure --parallel 4
+```
+
+Alternatively, use `make test` or `make testaddr` (AddressSanitizer).
+Tests default to enabled; `-DBUILD_TESTING=OFF` builds without Google Test.
