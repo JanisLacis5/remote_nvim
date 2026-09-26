@@ -5,7 +5,6 @@
 #include <netinet/in.h>
 
 #include <cerrno>
-#include <array>
 
 namespace {
     
@@ -75,32 +74,36 @@ std::vector<std::byte> socket::read(std::size_t len) {
     if (!is_valid())
         return {};
 
-    constexpr std::size_t buf_size = 4096;
-    std::array<std::byte, buf_size> buf{};
+    std::vector<std::byte> buf(len);
+    std::size_t total_read{};
+    while (total_read < len) {
+        const auto n_read = ::read(fd_, buf.data() + total_read, len - total_read );
+        if (n_read < 0 && errno == EINTR)
+            continue;
+        if (n_read <= 0)
+            return {};
 
-    int total_read{};
-    int n_read{};
-    while (total_read < len && 
-            (n_read = ::read(fd_, buf.data() + total_read, len - total_read)) > 0) {
         total_read += n_read;
     }
 
-    if (total_read != len)
-        return {};
-    return {buf.begin(), buf.begin() + n_read};
+    return buf;
 }
 
 std::size_t socket::write_all(const std::span<std::byte> payload) {
     if (!is_valid())
         return 0;
 
-    ssize_t written = ::write(fd_, payload.data(), payload.size());
-    while (written < payload.size()) {
-        auto tmp = ::write(fd_, payload.data() + written, payload.size() - written);
-        if (tmp <= 0)
+    std::size_t written{};
+    const auto to_write = payload.size();
+
+    while (written < to_write) {
+        const auto sent = ::write(fd_, payload.data() + written, to_write - written);
+        if (sent < 0 && errno == EINTR)
+            continue;
+        if (sent <= 0)
             break;
 
-        written += tmp;
+        written += sent;
     }
 
     return written;
