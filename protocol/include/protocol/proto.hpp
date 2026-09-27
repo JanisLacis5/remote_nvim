@@ -18,9 +18,12 @@ namespace proto
 // CONSTANTS
 static constexpr std::size_t MAX_MESSAGE_LEN = 1024;
 enum class message_type_enum : std::uint8_t {
-    open_ui,    // sent from server to client to open and attach remote nvim UI window
-    init_socket // sent from server to client to tell the type of socket (see networking::sock_type)
+    open_ui,     // sent from server to client to open and attach remote nvim UI window
+    init_socket, // sent from server to client to tell the type of socket (see networking::sock_type)
+
+    count // elements in the enum
 };
+using msg_type_underlying_t = std::underlying_type_t<message_type_enum>;
 
 // PAYLOADS (one for each message type)
 struct open_ui_payload {
@@ -86,6 +89,9 @@ public:
     template <typename T>
     bool write_msg(const T& msg) {
         auto message = encode(msg);
+        if (message.size > MAX_MESSAGE_LEN)
+            return false;
+
         auto written = sck_.write_all(std::span<std::byte>{ message.content.data(), message.size });
         return written == message.size;
     }
