@@ -1,9 +1,9 @@
 #ifndef PROCESS_H
 #define PROCESS_H
 
-#include <string>
 #include <filesystem>
 #include <initializer_list>
+#include <string>
 
 // todo: add function to exectue after exec that is passed by the caller
 class process
@@ -20,7 +20,7 @@ public:
     std::filesystem::path cwd();
 
 private:
-    int pid_{-1};
+    int pid_{ -1 };
 };
 
 #endif

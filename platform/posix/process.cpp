@@ -1,15 +1,13 @@
 #include "os/process.hpp"
-
 #include <filesystem>
 #include <sys/wait.h>
-
-#include <vector>
 #include <utility>
+#include <vector>
 
 process::process(std::initializer_list<std::string> raw_args) {
-    std::vector<std::string> args{raw_args};
+    std::vector<std::string> args{ raw_args };
 
-    std::vector<char*> cargs{args.size() + 1, nullptr};
+    std::vector<char*> cargs{ args.size() + 1, nullptr };
     for (std::size_t i = 0; i < args.size(); ++i)
         cargs[i] = args[i].data();
 
@@ -23,9 +21,8 @@ process::~process() {
     waitpid(pid_, NULL, 0);
 }
 
-process::process(process&& other) noexcept 
-    : pid_{std::exchange(other.pid_, -1)}
-{}
+process::process(process&& other) noexcept
+    : pid_{ std::exchange(other.pid_, -1) } {}
 
 process& process::operator=(process&& other) noexcept {
     pid_ = std::exchange(other.pid_, -1);

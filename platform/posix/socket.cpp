@@ -1,13 +1,12 @@
 #include "networking/socket.hpp"
-
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-
 #include <cerrno>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
-namespace {
-    
+namespace
+{
+
 sockaddr_in create_sockaddr_in(int family, std::uint32_t addr, std::uint16_t port) {
     sockaddr_in addr_in{};
     addr_in.sin_family = family;
@@ -16,50 +15,51 @@ sockaddr_in create_sockaddr_in(int family, std::uint32_t addr, std::uint16_t por
     return addr_in;
 }
 
-}
+} // namespace
 
-namespace networking {
+namespace networking
+{
 
 socket::socket(int family, int type, int protocol)
-    : sock_family_{family}, sock_type_{type}, sock_protocol_{protocol}
-{
+    : sock_family_{ family }
+    , sock_type_{ type }
+    , sock_protocol_{ protocol } {
     fd_ = ::socket(family, type, protocol);
-};
+}
 
 socket::socket(int fd)
-    : fd_{fd}
-{
-    if (fd_ < 0) [[ unlikely ]]
+    : fd_{ fd } {
+    if (fd_ < 0) [[unlikely]]
         return;
 
     socklen_t len = sizeof(sock_family_);
     auto err = ::getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &sock_family_, &len);
-    if (err) [[ unlikely ]] {
+    if (err) [[unlikely]] {
         close();
         return;
     }
 
     len = sizeof(sock_type_);
     err = ::getsockopt(fd, SOL_SOCKET, SO_TYPE, &sock_type_, &len);
-    if (err) [[ unlikely ]] {
+    if (err) [[unlikely]] {
         close();
         return;
     }
 
     len = sizeof(sock_protocol_);
     err = ::getsockopt(fd, SOL_SOCKET, SO_PROTOCOL, &sock_protocol_, &len);
-    if (err) [[ unlikely ]] {
+    if (err) [[unlikely]] {
         close();
         return;
     }
-};
+}
 
 bool socket::bind(std::uint32_t addr, std::uint16_t port) {
     if (!is_valid())
         return false;
 
     auto addr_in = create_sockaddr_in(sock_family_, addr, port);
-    return ::bind(fd_, (sockaddr *)&addr_in, sizeof(addr_in)) != -1;
+    return ::bind(fd_, (sockaddr*)&addr_in, sizeof(addr_in)) != -1;
 }
 
 bool socket::connect(std::uint32_t addr, std::uint16_t port) {
@@ -67,7 +67,7 @@ bool socket::connect(std::uint32_t addr, std::uint16_t port) {
         return false;
 
     auto addr_in = create_sockaddr_in(sock_family_, addr, port);
-    return ::connect(fd_, (sockaddr* )&addr_in, sizeof(addr_in)) != -1;
+    return ::connect(fd_, (sockaddr*)&addr_in, sizeof(addr_in)) != -1;
 }
 
 std::vector<std::byte> socket::read(std::size_t len) {
@@ -77,7 +77,7 @@ std::vector<std::byte> socket::read(std::size_t len) {
     std::vector<std::byte> buf(len);
     std::size_t total_read{};
     while (total_read < len) {
-        const auto n_read = ::read(fd_, buf.data() + total_read, len - total_read );
+        const auto n_read = ::read(fd_, buf.data() + total_read, len - total_read);
         if (n_read < 0 && errno == EINTR)
             continue;
         if (n_read <= 0)
@@ -116,4 +116,4 @@ void socket::close() {
     }
 }
 
-}
+} // namespace networking

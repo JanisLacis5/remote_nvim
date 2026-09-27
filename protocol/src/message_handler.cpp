@@ -1,16 +1,15 @@
 #include "protocol/proto.hpp"
-
 #include <cstdlib>
 
-namespace proto {
+namespace proto
+{
 
 message_handler::message_handler(networking::socket&& socket)
-    : sck_{std::move(socket)}
-{}
+    : sck_{ std::move(socket) } {}
 
 generic_message message_handler::read_msg() {
     auto raw = sck_.read(HEADER_SIZE);
-    if (raw.empty()) 
+    if (raw.empty())
         return {};
 
     auto maybe_raw_hdr = decode_hdr(raw);
@@ -58,7 +57,7 @@ bool message_handler::decode_init_socket(std::span<const std::byte> incoming, te
     if (incoming.size() < HEADER_SIZE)
         return false;
 
-    auto* ptr = incoming.data() + HEADER_SIZE; 
+    auto* ptr = incoming.data() + HEADER_SIZE;
     std::memcpy(&result.payload.type, ptr, sizeof(result.payload.type));
 
     return true;
@@ -67,19 +66,16 @@ bool message_handler::decode_init_socket(std::span<const std::byte> incoming, te
 bool message_handler::decode_open_ui(std::span<const std::byte> incoming, open_ui_message& result) {
     if (incoming.size() < HEADER_SIZE)
         return false;
-    
+
     auto* ptr = incoming.data() + HEADER_SIZE;
 
     std::uint16_t port;
     std::memcpy(&port, ptr, sizeof(port));
     ptr += sizeof(port);
-    result.payload.port= ntohs(port);
+    result.payload.port = ntohs(port);
 
     const std::size_t cwd_size = result.hdr.payload_size - sizeof(port);
-    result.payload.cwd = std::string(
-        reinterpret_cast<const char*>(ptr),
-        cwd_size
-    );
+    result.payload.cwd = std::string(reinterpret_cast<const char*>(ptr), cwd_size);
 
     return true;
 }
@@ -91,20 +87,18 @@ generic_message message_handler::decode(const std::span<std::byte> incoming) {
     auto raw_hdr = decode_hdr(incoming).value();
 
     switch (raw_hdr.msg_type) {
-    case proto::message_type_enum::open_ui:
-    {
-        open_ui_message result;
-        result.hdr.payload_size = raw_hdr.payload_size;
-        decode_open_ui(incoming, result);
-        return result;
-    }
-    case proto::message_type_enum::init_socket:
-    {
-        tell_sck_type_message result;
-        result.hdr.payload_size = raw_hdr.payload_size;
-        decode_init_socket(incoming, result);
-        return result;
-    }
+        case proto::message_type_enum::open_ui: {
+            open_ui_message result;
+            result.hdr.payload_size = raw_hdr.payload_size;
+            decode_open_ui(incoming, result);
+            return result;
+        }
+        case proto::message_type_enum::init_socket: {
+            tell_sck_type_message result;
+            result.hdr.payload_size = raw_hdr.payload_size;
+            decode_init_socket(incoming, result);
+            return result;
+        }
     }
 
     return {};
@@ -138,4 +132,4 @@ encoded_message message_handler::encode_payload(const tell_sck_type_payload& pay
     return result;
 }
 
-}
+} // namespace proto

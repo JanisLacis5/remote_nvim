@@ -1,17 +1,16 @@
 #include "networking/socket.hpp"
 #include <stdexcept>
 
-namespace networking {
-
-socket::socket(int family, int type, int protocol)
+namespace networking
 {
+
+socket::socket(int family, int type, int protocol) {
     throw std::logic_error("windows support not implemented");
 }
 
-socket::socket(int fd)
-{
+socket::socket(int fd) {
     throw std::logic_error("windows support not implemented");
-};
+}
 
 bool socket::bind(std::uint32_t addr, std::uint16_t port) {
     throw std::logic_error("windows support not implemented");
@@ -33,4 +32,4 @@ void socket::close() {
     throw std::logic_error("windows support not implemented");
 }
 
-}
+} // namespace networking

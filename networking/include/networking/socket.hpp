@@ -2,13 +2,13 @@
 #define SOCKET_H
 
 #include <arpa/inet.h>
-
 #include <cstdint>
+#include <span>
 #include <utility>
 #include <vector>
-#include <span>
 
-namespace networking {
+namespace networking
+{
 
 // todo: make a protocol lib and move sock_type and related stuff there
 enum class sock_type : std::uint8_t { bad, no_type, data, control };
@@ -21,7 +21,7 @@ constexpr std::byte type_to_byte(sock_type type) {
 constexpr sock_type byte_to_type(std::byte byte) {
     auto integral = static_cast<sock_type_underlying_t>(byte);
     return static_cast<networking::sock_type>(integral);
-};
+}
 
 class socket
 {
@@ -35,7 +35,7 @@ public:
     socket(socket&& other) noexcept;
     socket& operator=(socket&& other) noexcept;
 
-    bool is_valid() const noexcept { return fd_ >= 0; };
+    bool is_valid() const noexcept { return fd_ >= 0; }
 
     bool bind(std::uint32_t addr, std::uint16_t port);
     bool connect(std::uint32_t addr, std::uint16_t port);
@@ -43,7 +43,7 @@ public:
     std::size_t write_all(const std::span<std::byte> payload);
 
 private:
-    int fd_{-1};
+    int fd_{ -1 };
     int sock_family_{};
     int sock_type_{};
     int sock_protocol_{};
@@ -51,6 +51,6 @@ private:
     void close();
 };
 
-}
+} // namespace networking
 
 #endif

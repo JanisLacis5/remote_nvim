@@ -1,46 +1,45 @@
 #ifndef PROTO_H
 #define PROTO_H
 
-#include <arpa/inet.h>
-
-#include <algorithm>
-#include <optional>
-#include <cstring>
-#include <variant>
-#include <cstdint>
-#include <string>
-#include <array>
-#include <span>
-
 #include "networking/socket.hpp"
+#include <algorithm>
+#include <arpa/inet.h>
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <optional>
+#include <span>
+#include <string>
+#include <variant>
 
-namespace proto {
+namespace proto
+{
 
 // CONSTANTS
-static constexpr std::size_t MAX_MESSAGE_LEN  = 1024;
+static constexpr std::size_t MAX_MESSAGE_LEN = 1024;
 enum class message_type_enum : std::uint8_t {
-    open_ui,      // sent from server to client to open and attach remote nvim UI window
-    init_socket   // sent from server to client to tell the type of socket (see networking::sock_type)
+    open_ui,    // sent from server to client to open and attach remote nvim UI window
+    init_socket // sent from server to client to tell the type of socket (see networking::sock_type)
 };
 
 // PAYLOADS (one for each message type)
 struct open_ui_payload {
-    std::uint16_t port;  // port where neovim server is running (127.0.0.1:<PORT>)
-    std::string cwd;     // working dir on the server
+    std::uint16_t port; // port where neovim server is running (127.0.0.1:<PORT>)
+    std::string cwd;    // working dir on the server
 };
 struct tell_sck_type_payload {
-    networking::sock_type type;   // type of which a socket is being opened
+    networking::sock_type type; // type of which a socket is being opened
 };
 
 // CLASS TO GET MESSAGE TYPE FROM PAYLOAD
 template <typename T>
 struct message_type;
 
-template<>
+template <>
 struct message_type<open_ui_payload> {
     static constexpr auto value = message_type_enum::open_ui;
 };
-template<>
+template <>
 struct message_type<tell_sck_type_payload> {
     static constexpr auto value = message_type_enum::init_socket;
 };
@@ -66,12 +65,9 @@ struct message {
 
 // aliases for message (every message type should have an alias + be added to the std::variant below)
 using tell_sck_type_message = message<tell_sck_type_payload>;
-using open_ui_message       = message<open_ui_payload>;
+using open_ui_message = message<open_ui_payload>;
 
-using generic_message = std::variant<
-    open_ui_message,
-    tell_sck_type_message 
->;
+using generic_message = std::variant<open_ui_message, tell_sck_type_message>;
 
 // encoding / decoding functions
 struct encoded_message {
@@ -86,11 +82,11 @@ public:
 
     networking::socket release_socket();
 
-    generic_message read_msg(); 
+    generic_message read_msg();
     template <typename T>
     bool write_msg(const T& msg) {
         auto message = encode(msg);
-        auto written = sck_.write_all(std::span<std::byte>{message.content.data(), message.size});
+        auto written = sck_.write_all(std::span<std::byte>{ message.content.data(), message.size });
         return written == message.size;
     }
 
@@ -129,7 +125,6 @@ private:
     }
 };
 
-}
+} // namespace proto
 
 #endif
-

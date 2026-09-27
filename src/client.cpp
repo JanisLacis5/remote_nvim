@@ -32,16 +32,14 @@
 //     //   remote Nvim    -> process/intercept -> local Nvim UI
 // }
 
-#include <sys/wait.h>
-#include <netinet/in.h>
-#include <arpa/inet.h> 
-
+#include "networking/listener.hpp"
+#include "networking/socket.hpp"
+#include "protocol/proto.hpp"
+#include <arpa/inet.h>
 #include <cstdlib>
 #include <iostream>
-
-#include "networking/socket.hpp"
-#include "networking/listener.hpp"
-#include "protocol/proto.hpp"
+#include <netinet/in.h>
+#include <sys/wait.h>
 
 int main() {
     networking::listener listener{};
@@ -58,33 +56,32 @@ int main() {
         if (!maybe_sock.has_value())
             return -1;
 
-        proto::message_handler tmp_msg_hanlder{std::move(maybe_sock.value())};
+        proto::message_handler tmp_msg_hanlder{ std::move(maybe_sock.value()) };
         auto response = tmp_msg_hanlder.read_msg();
         auto* type_msg = std::get_if<proto::tell_sck_type_message>(&response);
         if (!type_msg)
             return -1;
 
         switch (type_msg->payload.type) {
-        case networking::sock_type::data:
-            data_sock_optional.emplace(std::move(tmp_msg_hanlder.release_socket()));
-            break;
-        case networking::sock_type::control:
-            ctrl_sock_optional.emplace(std::move(tmp_msg_hanlder.release_socket()));
-            break;
-        default:
-            std::cerr << "bad type" << std::endl;
-            break;
+            case networking::sock_type::data:
+                data_sock_optional.emplace(std::move(tmp_msg_hanlder.release_socket()));
+                break;
+            case networking::sock_type::control:
+                ctrl_sock_optional.emplace(std::move(tmp_msg_hanlder.release_socket()));
+                break;
+            default:
+                std::cerr << "bad type" << std::endl;
+                break;
         }
     }
 
-    proto::message_handler ctrl_msg_handler{std::move(ctrl_sock_optional.value())};
-    proto::message_handler data_msg_handler{std::move(data_sock_optional.value())};
+    proto::message_handler ctrl_msg_handler{ std::move(ctrl_sock_optional.value()) };
+    proto::message_handler data_msg_handler{ std::move(data_sock_optional.value()) };
 
     // get openui message
     auto message = ctrl_msg_handler.read_msg();
-    if (auto* open = std::get_if<proto::open_ui_message>(&message)) {
+    if (auto* open = std::get_if<proto::open_ui_message>(&message))
         std::cout << open->payload.cwd << std::endl;
-    }
 
     // open nvim ui and link it to /tmp/janisnvim.sock
 
