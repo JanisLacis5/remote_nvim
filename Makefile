@@ -55,5 +55,8 @@ test: debug
 testaddr: debugaddr
 	ctest --test-dir $(BUILD_ROOT)/debugaddr --output-on-failure $(CTEST_ARGS)
 
+format:
+	cmake --build build/linux/release --target format
+
 clean:
 	rm -rf build

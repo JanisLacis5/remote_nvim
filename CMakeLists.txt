@@ -64,6 +64,23 @@ elseif(NOT SANITIZER STREQUAL "none")
     message(FATAL_ERROR "Unknown sanitizer: ${SANITIZER}")
 endif()
 
+if (NOT EXISTS "${CMAKE_SOURCE_DIR}/.clang-format")
+    message(FATAL_ERROR "No .clang-format file found in ${CMAKE_SOURCE_DIR}")
+endif ()
+
+set(CLANG_FORMAT_BIN "/usr/bin/clang-format-20")
+file(GLOB_RECURSE FORMAT_FILES CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/*.cpp"
+    "${PROJECT_SOURCE_DIR}/*.hpp"
+)
+list(FILTER FORMAT_FILES EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/build/")
+
+add_custom_target(format
+    COMMAND ${CLANG_FORMAT_BIN} -i ${FORMAT_FILES}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running ${CLANG_FORMAT_BIN}"
+)
+
 add_subdirectory(networking)
 add_subdirectory(protocol)
 add_subdirectory(os_internals)
