@@ -18,7 +18,7 @@ process::process(std::initializer_list<std::string> raw_args) {
 
 process::~process() {
     // see `man waitpid` to replace NULL with status, process the status afterwards
-    waitpid(pid_, NULL, 0);
+    waitpid(pid_, nullptr, 0);
 }
 
 process::process(process&& other) noexcept
