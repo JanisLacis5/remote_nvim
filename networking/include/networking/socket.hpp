@@ -40,7 +40,7 @@ public:
     bool bind(std::uint32_t addr, std::uint16_t port);
     bool connect(std::uint32_t addr, std::uint16_t port);
     std::vector<std::byte> read(std::size_t len);
-    std::size_t write_all(const std::span<std::byte> payload);
+    std::size_t write_all(std::span<const std::byte> payload);
 
 private:
     int fd_{ -1 };
