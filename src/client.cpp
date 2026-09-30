@@ -34,11 +34,13 @@
 
 #include "networking/listener.hpp"
 #include "networking/socket.hpp"
+#include "os/process.hpp"
 #include "protocol/proto.hpp"
 #include <arpa/inet.h>
 #include <cstdlib>
 #include <iostream>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 
 int main() {
@@ -80,11 +82,34 @@ int main() {
 
     // get openui message
     auto message = ctrl_msg_handler.read_msg();
-    if (auto* open = std::get_if<proto::open_ui_message>(&message))
-        std::cout << open->payload.cwd << std::endl;
+    auto* open = std::get_if<proto::open_ui_message>(&message);
+    if (!open) {
+        std::cerr << "unexpected type of messsage" << std::endl;
+        return -1;
+    }
 
-    // open nvim ui and link it to /tmp/janisnvim.sock
+    // todo: use networking::socket for this
+    static constexpr std::string_view nvim_sock_path = "/tmp/janisnvim.sock";
+    int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    std::strncpy(addr.sun_path, nvim_sock_path.data(), sizeof(addr.sun_path) - 1);
+    ::unlink(addr.sun_path); // remove stale socket from previous run
+
+    if (::bind(fd, (sockaddr*)&addr, sizeof(addr)) == -1) {
+        std::cerr << "error binding nvim socket, errno: " << std::strerror(errno) << std::endl;
+        return -1;
+    }
+
+    if (::listen(fd, SOMAXCONN) == -1) {
+        std::cerr << "error listening nvim socket, errno: " << std::strerror(errno) << std::endl;
+        return -1;
+    }
+    process nvim_proc{ "kitty", "nvim", "--server", nvim_sock_path, "--remote-ui" };
 
     /* accept the local Nvim UI connection and read all bytes from
         the /tmp/janisnvim.sock and forward them to 127.0.0.1:7780 */
+
+    // on close, send close ui message
 }

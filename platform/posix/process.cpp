@@ -4,10 +4,13 @@
 #include <utility>
 #include <vector>
 
-process::process(std::initializer_list<std::string> raw_args) {
-    std::vector<std::string> args{ raw_args };
+process::process(std::initializer_list<std::string_view> raw_args) {
+    std::vector<std::string> args;
+    args.reserve(raw_args.size());
+    for (const auto& arg : raw_args)
+        args.emplace_back(arg.begin(), arg.end());
 
-    std::vector<char*> cargs{ args.size() + 1, nullptr };
+    std::vector<char*> cargs(args.size() + 1, nullptr);
     for (std::size_t i = 0; i < args.size(); ++i)
         cargs[i] = args[i].data();
 

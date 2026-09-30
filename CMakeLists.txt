@@ -104,6 +104,7 @@ target_link_libraries(janisnvimdaemon
     PRIVATE
         networking
         protocol
+        os
 )
 
 include(CTest)

@@ -3,13 +3,13 @@
 
 #include <filesystem>
 #include <initializer_list>
-#include <string>
+#include <string_view>
 
 // todo: add function to exectue after exec that is passed by the caller
 class process
 {
 public:
-    process(std::initializer_list<std::string> raw_args);
+    process(std::initializer_list<std::string_view> raw_args);
     ~process();
 
     process(const process&) = delete;
