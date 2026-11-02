@@ -68,12 +68,8 @@ listener::~listener() {
     close();
 }
 
-listener::listener(listener&& other) noexcept {
-    if (this != &other) {
-        close();
-        fd_ = std::exchange(other.fd_, -1);
-    }
-}
+listener::listener(listener&& other) noexcept
+    : fd_{ std::exchange(other.fd_, -1) } {}
 
 listener& listener::operator=(listener&& other) noexcept {
     if (this != &other) {
