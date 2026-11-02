@@ -78,3 +78,99 @@ Do not decide these implicitly while implementing an unrelated feature:
 ## Testing priorities
 
 Use targeted tests for remote identity/path mapping, LSP request/response and document URI translation, cached-file lifecycle, concurrent remote modifications, interrupted synchronization, error recovery, and responsiveness under network delay. Tests must validate precise expected behavior rather than only exercising happy-path integration.
+
+## Engineering and Code Quality Requirements
+
+### Simplicity and Architecture
+
+- Prefer the simplest implementation that satisfies the requirements.
+- Do not introduce abstractions, interfaces, inheritance hierarchies, factories, or design patterns without a concrete need.
+- Prefer concrete types, free functions, and small cohesive classes.
+- Avoid speculative extensibility, unnecessary configuration, and overengineering.
+- Do not refactor unrelated code while implementing a feature.
+- Prefer explicit ownership and deterministic resource management.
+- Do not introduce dependencies without explaining why they are necessary.
+- Do not silently change architectural assumptions.
+
+### Formatting, Spacing, and Readability
+
+**Vertical whitespace is a strict code quality requirement, not an optional stylistic preference.**
+
+Generated code must be visually organized into distinct logical blocks. Dense, uninterrupted sequences of statements are unacceptable, even when the code is technically correct and passes formatting checks.
+
+Follow these rules:
+
+- **Separate logically distinct groups of statements with a blank line.** This includes setup, validation, resource acquisition, computation, state changes, error handling, and cleanup.
+- **Use blank lines to communicate intent.** A reader should be able to identify the major stages of a function by scanning its structure.
+- **Always separate function definitions with blank lines.**
+- **Separate unrelated declarations and operations.** Do not pack initialization, conditionals, loops, and return statements into one uninterrupted block.
+- **Keep tightly related statements together.** Do not insert blank lines mechanically after every statement.
+- **Prefer short, clearly structured functions.** If a function contains many unrelated logical sections, consider whether decomposition would improve clarity. Do not introduce unnecessary helper functions solely to shorten code.
+- **Prioritize human readability over compactness.** Minimizing the number of lines is not a goal.
+- Follow the repository's `.clang-format` configuration, but recognize that passing `clang-format` does not guarantee acceptable vertical spacing.
+- Match the existing codebase's naming conventions, indentation, brace style, and organizational patterns.
+
+#### Example of unacceptable formatting
+
+```cpp
+void process() {
+    auto data = read_data();
+    if (data.empty()) return;
+    auto result = transform(data);
+    if (!result) return;
+    write_data(*result);
+    log_success();
+}
+```
+
+#### Expected formatting
+
+```cpp
+void process() {
+    auto data = read_data();
+    if (data.empty())
+        return;
+
+    auto result = transform(data);
+    if (!result)
+        return;
+
+    write_data(*result);
+
+    log_success();
+}
+```
+
+The second example is preferred because validation, transformation, output, and reporting are visually separated.
+
+**Before finishing any implementation, review the code specifically for vertical whitespace and logical grouping.** Do not consider code complete simply because it compiles, passes tests, or conforms to `clang-format`.
+
+### Scope and Maintainability
+
+- Keep patches focused and reasonably small.
+- Avoid modifying unrelated files.
+- Do not add unnecessary comments explaining obvious code.
+- Prefer clear control flow over clever or overly compact expressions.
+- Do not sacrifice readability to reduce line count.
+- Follow established patterns in the repository unless there is a concrete reason to change them.
+
+### Before Implementing a Substantial Feature
+
+Briefly explain:
+
+1. The proposed implementation.
+2. Any new abstractions or dependencies.
+3. The important correctness and failure cases.
+
+Wait for approval before introducing significant architectural changes.
+
+### After Implementation
+
+Report:
+
+- What changed.
+- What was tested.
+- What remains unverified.
+- Any important design decisions made during implementation.
+
+Before presenting the final result, inspect the generated code for unnecessary abstractions, dense formatting, missing blank lines between logical blocks, and deviations from the existing code style.
