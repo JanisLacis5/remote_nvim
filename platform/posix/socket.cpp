@@ -24,7 +24,7 @@ socket::socket(int family, int type, int protocol)
     : sock_family_{ family }
     , sock_type_{ type }
     , sock_protocol_{ protocol } {
-    fd_ = ::socket(family, type, protocol);
+    fd_ = ::socket(family, type | SOCK_CLOEXEC, protocol);
 }
 
 socket::socket(int fd)
@@ -97,7 +97,7 @@ std::size_t socket::write_all(std::span<const std::byte> payload) {
     const auto to_write = payload.size();
 
     while (written < to_write) {
-        const auto sent = ::write(fd_, payload.data() + written, to_write - written);
+        const auto sent = ::send(fd_, payload.data() + written, to_write - written, MSG_NOSIGNAL);
         if (sent < 0 && errno == EINTR)
             continue;
         if (sent <= 0)
