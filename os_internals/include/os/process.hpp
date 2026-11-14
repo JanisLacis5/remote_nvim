@@ -5,7 +5,6 @@
 #include <initializer_list>
 #include <string_view>
 
-// todo: add function to exectue after exec that is passed by the caller
 class process
 {
 public:
@@ -18,9 +17,12 @@ public:
     process& operator=(process&& other) noexcept;
 
     std::filesystem::path cwd();
+    bool running();
+    int wait();
 
 private:
     int pid_{ -1 };
+    int status_{ -1 };
 };
 
 #endif
