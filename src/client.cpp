@@ -1,115 +1,221 @@
-// janisnvimdaemon - runs on the client
-//
-// POC requirement:
-// The user connects to the remote machine with:
-//
-//   ssh -R 7778:127.0.0.1:7777 SERVER
-//
-// This makes remote 127.0.0.1:7778 forward to the local daemon
-// listening on 127.0.0.1:7777.
-//
-// main() {
-//     // listen on 127.0.0.1:7777 for OPEN_UI requests
-//
-//     // receive OPEN_UI message containing:
-//     //   - remote host
-//     //   - remote Nvim RPC port
-//     //   - cwd / session metadata as needed
-//
-//     // establish a connection/tunnel to the remote Nvim server where
-//     // rpc commands will be forwarded from socket to this address:port
-//
-//     // create and listen on /tmp/janisnvim.sock
-//
-//     // run:
-//     //   nvim --server /tmp/janisnvim.sock --remote-ui
-//
-//     // accept the local Nvim UI connection and read all bytes from
-//     // the /tmp/janisnvim.sock and forward them to 127.0.0.1:7780
-//
-//     // proxy both directions:
-//     //   local Nvim UI -> process/intercept -> remote Nvim
-//     //   remote Nvim    -> process/intercept -> local Nvim UI
-// }
-
+// Local service and asynchronous save helper.
 #include "networking/listener.hpp"
-#include "networking/socket.hpp"
 #include "os/process.hpp"
 #include "protocol/proto.hpp"
-#include <arpa/inet.h>
+#include "workspace.hpp"
+#include <cerrno>
 #include <cstdlib>
+#include <cstring>
+#include <fcntl.h>
 #include <iostream>
-#include <netinet/in.h>
+#include <poll.h>
+#include <sys/file.h>
+#include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/wait.h>
+#include <unistd.h>
 
-int main() {
-    networking::listener listener{};
-    if (!listener.is_valid()) {
-        std::cerr << "listener invalid, terminating" << std::endl;
-        return -1;
+namespace
+{
+
+using workspace::require;
+
+void timeout(int fd) {
+    const timeval limit{ 30, 0 };
+    require(::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &limit, sizeof(limit)) == 0 &&
+                ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &limit, sizeof(limit)) == 0,
+            "cannot set transport timeout");
+}
+
+sockaddr_un address(const std::string& path) {
+    sockaddr_un result{};
+    result.sun_family = AF_UNIX;
+    require(path.size() < sizeof(result.sun_path), "local socket path too long");
+
+    std::memcpy(result.sun_path, path.c_str(), path.size() + 1);
+
+    return result;
+}
+
+int save(const char* socket_path, const char* file) {
+    auto content = workspace::read_file(file).content;
+
+    networking::socket connection{ AF_UNIX, SOCK_STREAM };
+    timeout(connection.native_handle());
+
+    auto addr = address(socket_path);
+    require(::connect(connection.native_handle(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0,
+            "session unavailable; saved local copy retained; reopen remotely to reconnect");
+
+    proto::message_handler channel{ std::move(connection) };
+    require(channel.write_msg({ proto::message_type::save, { std::move(content) } }),
+            "cannot queue save; local copy retained");
+
+    auto response = channel.read_msg();
+    require(response.has_value(), "sync timed out or disconnected; remote outcome uncertain, local copy retained");
+    if (response->type == proto::message_type::error && response->fields.size() == 1)
+        throw std::runtime_error(response->fields[0]);
+    require(response->type == proto::message_type::ok && response->fields.empty(), "invalid sync response");
+
+    std::cout << "Remote file synchronized\n";
+
+    return 0;
+}
+
+struct runtime_directory {
+    std::string path{ "/tmp/janisnvim-XXXXXX" };
+
+    runtime_directory() { require(::mkdtemp(path.data()) != nullptr, "cannot create session directory"); }
+
+    ~runtime_directory() {
+        ::unlink((path + "/sync.sock").c_str());
+        ::rmdir(path.c_str());
+    }
+};
+
+void session(proto::message_handler& remote, const proto::message& request, const std::filesystem::path& root) {
+    require(request.type == proto::message_type::open && request.fields.size() == 4, "expected an open-file request");
+
+    auto entry = workspace::cache_entry(root, request.fields[0], request.fields[1], request.fields[2]);
+    const auto working = entry / "working";
+    workspace::private_directory(working);
+
+    const auto file = working / std::filesystem::path(request.fields[2]).filename();
+    workspace::descriptor lock{ ::open((entry / "lock").c_str(), O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0600) };
+    require(::flock(lock.get(), LOCK_EX | LOCK_NB) == 0, "cached file already open");
+
+    try {
+        workspace::prepare_cache(entry, file, request.fields[3]);
+    } catch (const std::exception& error) {
+        throw std::runtime_error(std::string(error.what()) + "; cache: " + file.string());
     }
 
-    std::optional<networking::socket> ctrl_sock_optional;
-    std::optional<networking::socket> data_sock_optional;
+    runtime_directory runtime;
+    const auto socket_path = runtime.path + "/sync.sock";
+    networking::socket listener{ AF_UNIX, SOCK_STREAM };
 
-    for (auto i = 0; i < 2; ++i) {
-        auto maybe_sock = listener.accept();
-        if (!maybe_sock.has_value())
-            return -1;
+    auto addr = address(socket_path);
+    require(::bind(listener.native_handle(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0 &&
+                ::listen(listener.native_handle(), 16) == 0,
+            "cannot listen for local saves");
 
-        proto::message_handler tmp_msg_hanlder{ std::move(maybe_sock.value()) };
-        auto response = tmp_msg_hanlder.read_msg();
-        auto* type_msg = std::get_if<proto::tell_sck_type_message>(&response);
-        if (!type_msg)
-            return -1;
+    const auto executable = std::filesystem::read_symlink("/proc/self/exe").string();
+    require(::setenv("JANISNVIM_HELPER", executable.c_str(), 1) == 0 &&
+                ::setenv("JANISNVIM_SESSION", socket_path.c_str(), 1) == 0 &&
+                ::setenv("JANISNVIM_FILE", file.c_str(), 1) == 0 && ::setenv("JANISNVIM_LUA", JANISNVIM_LUA, 1) == 0,
+            "cannot configure editor environment");
 
-        switch (type_msg->payload.type) {
-            case networking::sock_type::data:
-                data_sock_optional.emplace(std::move(tmp_msg_hanlder.release_socket()));
-                break;
-            case networking::sock_type::control:
-                ctrl_sock_optional.emplace(std::move(tmp_msg_hanlder.release_socket()));
-                break;
-            default:
-                std::cerr << "bad type" << std::endl;
-                break;
+    const char* terminal = std::getenv("JANISNVIM_TERMINAL");
+    if (!terminal || !*terminal)
+        terminal = "kitty";
+
+    process editor{ terminal, "nvim", "-c", "lua dofile(vim.env.JANISNVIM_LUA)", "--", file.string() };
+    require(remote.write_msg({ proto::message_type::ok, { file.string() } }), "open acknowledgement failed");
+    std::cerr << "Editing " << request.fields[2] << " in " << file << '\n';
+
+    bool connected = true;
+    while (editor.running()) {
+        pollfd waiting{ listener.native_handle(), POLLIN, 0 };
+        const auto ready = ::poll(&waiting, 1, 200);
+        if (ready < 0 && errno == EINTR)
+            continue;
+        require(ready >= 0, "local save polling failed");
+        if (!(waiting.revents & POLLIN))
+            continue;
+
+        networking::socket peer{ ::accept4(listener.native_handle(), nullptr, nullptr, SOCK_CLOEXEC) };
+        if (!peer.is_valid())
+            continue;
+
+        timeout(peer.native_handle());
+        proto::message_handler local{ std::move(peer) };
+
+        try {
+            auto update = local.read_msg();
+            require(update && update->type == proto::message_type::save && update->fields.size() == 1,
+                    "invalid local save");
+            require(connected, "remote connection lost; reopen remotely to reconnect; local copy retained");
+
+            if (!remote.write_msg(*update)) {
+                connected = false;
+                throw std::runtime_error("remote connection lost; local copy retained");
+            }
+
+            auto reply = remote.read_msg();
+            if (!reply) {
+                connected = false;
+                throw std::runtime_error("remote save outcome uncertain; local copy retained");
+            }
+
+            if (reply->type == proto::message_type::error && reply->fields.size() == 1)
+                throw std::runtime_error(reply->fields[0]);
+            require(reply->type == proto::message_type::ok && reply->fields.empty(), "invalid remote acknowledgement");
+
+            workspace::atomic_write(entry / "base", update->fields[0]);
+            local.write_msg({ proto::message_type::ok, {} });
+        } catch (const std::exception& error) {
+            std::cerr << "Sync: " << error.what() << '\n';
+            local.write_msg({ proto::message_type::error, { error.what() } });
         }
     }
 
-    proto::message_handler ctrl_msg_handler{ std::move(ctrl_sock_optional.value()) };
-    proto::message_handler data_msg_handler{ std::move(data_sock_optional.value()) };
+    require(editor.wait() == 0, "terminal/editor exited unsuccessfully; cached file retained");
+    if (connected)
+        remote.write_msg({ proto::message_type::close, {} });
+}
 
-    // get openui message
-    auto message = ctrl_msg_handler.read_msg();
-    auto* open = std::get_if<proto::open_ui_message>(&message);
-    if (!open) {
-        std::cerr << "unexpected type of messsage" << std::endl;
-        return -1;
+} // namespace
+
+int main(int argc, char** argv) {
+    try {
+        if (argc == 4 && std::string_view(argv[1]) == "--sync")
+            return save(argv[2], argv[3]);
+
+        require(argc == 1, "usage: janisnvimdaemon");
+
+        const char* token = std::getenv("JANISNVIM_TOKEN");
+        require(token && std::string_view(token).size() >= 32,
+                "set JANISNVIM_TOKEN to a shared random secret (at least 32 characters)");
+        const std::string secret{ token };
+
+        const char* cache = std::getenv("XDG_CACHE_HOME");
+        const char* home = std::getenv("HOME");
+        require((cache && *cache) || (home && *home), "HOME or XDG_CACHE_HOME is required");
+        auto parent = cache && *cache ? std::filesystem::path(cache) : std::filesystem::path(home) / ".cache";
+        require(parent.is_absolute(), "cache root must be absolute");
+
+        std::filesystem::create_directories(parent);
+        const auto root = parent / "janisnvim";
+        workspace::private_directory(root);
+
+        networking::listener listener{};
+        require(listener.is_valid(), "cannot listen on 127.0.0.1:7777");
+
+        // shortcut: one editor session at a time; add per-session workers when simultaneous sessions are needed.
+        for (;;) {
+            auto accepted = listener.accept();
+            if (!accepted)
+                continue;
+
+            timeout(accepted->native_handle());
+            proto::message_handler remote{ std::move(*accepted) };
+
+            try {
+                const auto auth = remote.read_msg();
+                require(auth && auth->type == proto::message_type::authenticate && auth->fields.size() == 1 &&
+                            auth->fields[0] == secret,
+                        "authentication failed");
+                require(remote.write_msg({ proto::message_type::ok, {} }), "authentication acknowledgement failed");
+
+                auto request = remote.read_msg();
+                require(request.has_value(), "file request missing or malformed");
+                session(remote, *request, root);
+            } catch (const std::exception& error) {
+                std::cerr << "janisnvimdaemon: " << error.what() << '\n';
+                remote.write_msg({ proto::message_type::error, { error.what() } });
+            }
+        }
+    } catch (const std::exception& error) {
+        std::cerr << "janisnvimdaemon: " << error.what() << '\n';
+        return 1;
     }
-
-    // todo: use networking::socket for this
-    static constexpr std::string_view nvim_sock_path = "/tmp/janisnvim.sock";
-    int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    std::strncpy(addr.sun_path, nvim_sock_path.data(), sizeof(addr.sun_path) - 1);
-    ::unlink(addr.sun_path); // remove stale socket from previous run
-
-    if (::bind(fd, (sockaddr*)&addr, sizeof(addr)) == -1) {
-        std::cerr << "error binding nvim socket, errno: " << std::strerror(errno) << std::endl;
-        return -1;
-    }
-
-    if (::listen(fd, SOMAXCONN) == -1) {
-        std::cerr << "error listening nvim socket, errno: " << std::strerror(errno) << std::endl;
-        return -1;
-    }
-    process nvim_proc{ "kitty", "nvim", "--server", nvim_sock_path, "--remote-ui" };
-
-    /* accept the local Nvim UI connection and read all bytes from
-        the /tmp/janisnvim.sock and forward them to 127.0.0.1:7780 */
-
-    // on close, send close ui message
 }

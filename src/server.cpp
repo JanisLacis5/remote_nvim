@@ -1,69 +1,88 @@
-// janisnvim - runs on the remote machine
-//
-// main() {
-//     // start:
-//     //   nvim --headless --listen 127.0.0.1:7780
-//
-//     // connect to 127.0.0.1:7778 (forwarded by the user's ssh -R to janisnvimdaemon)
-//     //   // open ctrl_fd for custom protocol messages
-//     //   // open data_fd for neovim rpc messages that can be forwarded to nvim_fd
-//     //   // with no edits
-//
-//     // send OPEN_UI containing (to ctrl_fd):
-//     //   - Nvim RPC endpoint
-//     //   - cwd
-//     //   - other session metadata if needed
-//
-//     // wait for session / child processes as appropriate
-// }
-
+// Invoked on the remote host; owns one file session, never an editor.
 #include "networking/socket.hpp"
-#include "os/process.hpp"
 #include "protocol/proto.hpp"
-#include <arpa/inet.h>
+#include "workspace.hpp"
 #include <cstdlib>
+#include <fcntl.h>
 #include <iostream>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/wait.h>
+#include <sys/file.h>
 #include <unistd.h>
-#include <utility>
 
-int main() {
-    process nvim_proc{ "nvim", "--listen", "127.0.0.1:7780", "--headless" };
+int main(int argc, char** argv) {
+    using workspace::require;
 
-    networking::socket ctrl_sock{ AF_INET, SOCK_STREAM };
-    if (!ctrl_sock.is_valid())
-        return -1;
-    if (!ctrl_sock.connect(INADDR_LOOPBACK, 7778))
-        return -1;
-    proto::message_handler ctrl_msg_handler{ std::move(ctrl_sock) };
+    try {
+        require(argc == 2, "usage: janisnvim path/to/existing-file");
 
-    auto ctrl_message = proto::tell_sck_type_message{ .payload{ .type = networking::sock_type::control } };
-    if (!ctrl_msg_handler.write_msg(ctrl_message))
-        return -1;
+        const char* token = std::getenv("JANISNVIM_TOKEN");
+        require(token && std::string_view(token).size() >= 32,
+                "set JANISNVIM_TOKEN to the daemon's shared secret (at least 32 characters)");
 
-    networking::socket data_sock{ AF_INET, SOCK_STREAM };
-    if (!data_sock.is_valid())
-        return -1;
-    if (!data_sock.connect(INADDR_LOOPBACK, 7778))
-        return -1;
-    proto::message_handler data_msg_handler{ std::move(data_sock) };
+        const auto directory = std::filesystem::canonical(std::filesystem::current_path());
+        const auto path = std::filesystem::canonical(argv[1]);
+        const auto relative = path.lexically_relative(directory);
+        require(!relative.empty() && *relative.begin() != "..",
+                "file must resolve inside the current workspace directory");
 
-    auto data_message = proto::tell_sck_type_message{ .payload{ .type = networking::sock_type::data } };
-    if (!data_msg_handler.write_msg(data_message))
-        return -1;
+        auto baseline = workspace::read_file(path);
 
-    networking::socket nvim_sock{ AF_INET, SOCK_STREAM };
-    if (!nvim_sock.is_valid())
-        return -1;
-    if (!nvim_sock.connect(INADDR_LOOPBACK, 7778))
-        return -1;
-    proto::message_handler nvim_msg_handler{ std::move(nvim_sock) };
+        auto host = workspace::read_file("/etc/machine-id").content;
+        while (!host.empty() && (host.back() == '\n' || host.back() == '\r'))
+            host.pop_back();
 
-    auto message = proto::open_ui_message{ .payload{ .port = 7777, .cwd = nvim_proc.cwd() } };
-    if (!ctrl_msg_handler.write_msg(message)) {
-        std::cerr << "write failed" << std::endl;
-        return -1;
+        require(!host.empty(), "machine-id is empty");
+        host += ":" + std::to_string(::geteuid());
+
+        // Cooperating sessions lock a stable sidecar across atomic replacements.
+        const auto lock_path = path.parent_path() / (".janisnvim-" + path.filename().string() + ".lock");
+        workspace::descriptor lock{ ::open(lock_path.c_str(), O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0600) };
+        require(::flock(lock.get(), LOCK_EX | LOCK_NB) == 0, "file already open in another janisnvim session");
+
+        networking::socket socket{ AF_INET, SOCK_STREAM };
+        require(socket.connect(INADDR_LOOPBACK, 7778),
+                "cannot reach local daemon via SSH reverse forward on port 7778");
+
+        proto::message_handler channel{ std::move(socket) };
+
+        require(channel.write_msg({ proto::message_type::authenticate, { token } }), "authentication send failed");
+
+        auto authenticated = channel.read_msg();
+        require(authenticated && authenticated->type == proto::message_type::ok, "daemon authentication failed");
+
+        require(channel.write_msg(
+                    { proto::message_type::open, { host, directory.string(), path.string(), baseline.content } }),
+                "file transfer failed");
+
+        auto opened = channel.read_msg();
+        if (opened && opened->type == proto::message_type::error && opened->fields.size() == 1)
+            throw std::runtime_error(opened->fields[0]);
+        require(opened && opened->type == proto::message_type::ok && opened->fields.size() == 1,
+                "local editor failed to open");
+
+        std::cout << "Local working copy: " << opened->fields[0] << '\n';
+
+        while (auto request = channel.read_msg()) {
+            if (request->type == proto::message_type::error && request->fields.size() == 1)
+                throw std::runtime_error(request->fields[0]);
+
+            if (request->type == proto::message_type::close && request->fields.empty())
+                return 0;
+
+            require(request->type == proto::message_type::save && request->fields.size() == 1, "invalid save request");
+
+            try {
+                workspace::sync_file(path, baseline, request->fields[0]);
+
+                require(channel.write_msg({ proto::message_type::ok, {} }), "save acknowledgement failed");
+            } catch (const std::exception& error) {
+                require(channel.write_msg({ proto::message_type::error, { error.what() } }),
+                        "connection lost during save");
+            }
+        }
+
+        throw std::runtime_error("connection lost; local cached edits are retained");
+    } catch (const std::exception& error) {
+        std::cerr << "janisnvim: " << error.what() << '\n';
+        return 1;
     }
 }

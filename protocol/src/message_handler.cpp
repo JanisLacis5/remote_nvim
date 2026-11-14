@@ -1,135 +1,68 @@
 #include "protocol/proto.hpp"
-#include <cstdlib>
+#include <cstring>
 
 namespace proto
 {
 
 message_handler::message_handler(networking::socket&& socket)
-    : sck_{ std::move(socket) } {}
+    : socket_{ std::move(socket) } {}
 
-generic_message message_handler::read_msg() {
-    auto raw = sck_.read(HEADER_SIZE);
-    if (raw.empty())
+std::optional<message> message_handler::read_msg() {
+    const auto header = socket_.read(6);
+    if (header.size() != 6 || header[0] != std::byte{ 'J' } || header[1] != std::byte{ 'N' } ||
+        header[2] != std::byte{ 1 } || header[3] < std::byte{ 1 } || header[3] > std::byte{ 6 } ||
+        header[4] > std::byte{ 4 } || header[5] != std::byte{ 0 })
         return {};
 
-    auto maybe_raw_hdr = decode_hdr(raw);
-    if (!maybe_raw_hdr.has_value())
-        return {};
-    auto& raw_hdr = maybe_raw_hdr.value();
+    message result{ static_cast<message_type>(header[3]), {} };
+    for (unsigned i = 0; i < std::to_integer<unsigned>(header[4]); ++i) {
+        auto length = socket_.read(4);
+        if (length.size() != 4)
+            return {};
 
-    auto raw_payload = sck_.read(raw_hdr.payload_size);
-    if (raw_payload.empty())
-        return {};
+        std::uint32_t size;
+        std::memcpy(&size, length.data(), 4);
+        size = ntohl(size);
+        if (size > MAX_FIELD_SIZE)
+            return {};
 
-    std::array<std::byte, MAX_MESSAGE_LEN> msg;
-    std::copy_n(raw.begin(), HEADER_SIZE, msg.begin());
-    std::copy_n(raw_payload.begin(), raw_payload.size(), msg.begin() + HEADER_SIZE);
+        auto bytes = socket_.read(size);
+        if (bytes.size() != size)
+            return {};
 
-    return decode(msg);
-}
-
-networking::socket message_handler::release_socket() {
-    return std::move(sck_);
-}
-
-std::optional<raw_message_header> message_handler::decode_hdr(std::span<const std::byte> incoming) {
-    if (incoming.size() < HEADER_SIZE)
-        return {};
-
-    raw_message_header hdr;
-    auto* ptr = incoming.data();
-
-    auto integral = static_cast<std::underlying_type_t<message_type_enum>>(*ptr);
-    hdr.msg_type = static_cast<message_type_enum>(integral);
-    ptr++;
-
-    std::uint32_t payload_size;
-    std::memcpy(&payload_size, ptr, sizeof(payload_size));
-    hdr.payload_size = ntohl(payload_size);
-
-    return hdr;
-}
-
-bool message_handler::decode_init_socket(std::span<const std::byte> incoming, tell_sck_type_message& result) {
-    // assert because endianness is ignored in this function
-    static_assert(sizeof(result.payload.type) == 1);
-
-    if (incoming.size() < HEADER_SIZE)
-        return false;
-
-    auto* ptr = incoming.data() + HEADER_SIZE;
-    std::memcpy(&result.payload.type, ptr, sizeof(result.payload.type));
-
-    return true;
-}
-
-bool message_handler::decode_open_ui(std::span<const std::byte> incoming, open_ui_message& result) {
-    if (incoming.size() < HEADER_SIZE)
-        return false;
-
-    auto* ptr = incoming.data() + HEADER_SIZE;
-
-    std::uint16_t port;
-    std::memcpy(&port, ptr, sizeof(port));
-    ptr += sizeof(port);
-    result.payload.port = ntohs(port);
-
-    const std::size_t cwd_size = result.hdr.payload_size - sizeof(port);
-    result.payload.cwd = std::string(reinterpret_cast<const char*>(ptr), cwd_size);
-
-    return true;
-}
-
-generic_message message_handler::decode(const std::span<std::byte> incoming) {
-    if (incoming.size() < HEADER_SIZE)
-        return {};
-
-    auto raw_hdr = decode_hdr(incoming).value();
-
-    switch (raw_hdr.msg_type) {
-        case proto::message_type_enum::open_ui: {
-            open_ui_message result;
-            result.hdr.payload_size = raw_hdr.payload_size;
-            decode_open_ui(incoming, result);
-            return result;
-        }
-        case proto::message_type_enum::init_socket: {
-            tell_sck_type_message result;
-            result.hdr.payload_size = raw_hdr.payload_size;
-            decode_init_socket(incoming, result);
-            return result;
-        }
+        result.fields.emplace_back(bytes.empty() ? "" : reinterpret_cast<const char*>(bytes.data()), bytes.size());
     }
 
-    return {};
-}
-
-encoded_message message_handler::encode_payload(const open_ui_payload& payload) {
-    if (payload.cwd.size() + sizeof(uint16_t) > MAX_MESSAGE_LEN)
-        return {};
-
-    encoded_message result;
-
-    std::uint16_t port = htons(payload.port);
-    std::memcpy(result.content.begin(), &port, sizeof(port));
-    result.size += sizeof(port);
-
-    std::memcpy(result.content.data() + result.size, payload.cwd.data(), payload.cwd.size());
-    result.size += payload.cwd.size();
-
     return result;
 }
 
-encoded_message message_handler::encode_payload(const tell_sck_type_payload& payload) {
-    // endinanness ignored
-    static_assert(sizeof(payload.type) == 1);
+bool message_handler::write_msg(const message& message) {
+    if (message.fields.size() > 4 || message.type < message_type::open || message.type > message_type::authenticate)
+        return false;
 
-    encoded_message result;
+    for (const auto& field : message.fields)
+        if (field.size() > MAX_FIELD_SIZE)
+            return false;
 
-    std::memcpy(result.content.data(), &payload.type, sizeof(payload.type));
-    result.size = sizeof(payload.type);
+    const std::byte header[]{ std::byte{ 'J' },
+                              std::byte{ 'N' },
+                              std::byte{ 1 },
+                              static_cast<std::byte>(message.type),
+                              static_cast<std::byte>(message.fields.size()),
+                              std::byte{ 0 } };
+    if (socket_.write_all(header) != sizeof(header))
+        return false;
 
-    return result;
+    for (const auto& field : message.fields) {
+        const auto size = htonl(static_cast<std::uint32_t>(field.size()));
+        const auto length = std::as_bytes(std::span{ &size, 1 });
+        const auto bytes = std::as_bytes(std::span{ field.data(), field.size() });
+
+        if (socket_.write_all(length) != length.size() || socket_.write_all(bytes) != bytes.size())
+            return false;
+    }
+
+    return true;
 }
 
 } // namespace proto

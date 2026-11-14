@@ -10,19 +10,6 @@
 namespace networking
 {
 
-// todo: make a protocol lib and move sock_type and related stuff there
-enum class sock_type : std::uint8_t { bad, no_type, data, control };
-using sock_type_underlying_t = std::underlying_type_t<sock_type>;
-static_assert(sizeof(sock_type_underlying_t) == 1);
-
-constexpr std::byte type_to_byte(sock_type type) {
-    return static_cast<std::byte>(std::to_underlying(type));
-}
-constexpr sock_type byte_to_type(std::byte byte) {
-    auto integral = static_cast<sock_type_underlying_t>(byte);
-    return static_cast<networking::sock_type>(integral);
-}
-
 class socket
 {
 public:
@@ -35,6 +22,7 @@ public:
     socket(socket&& other) noexcept;
     socket& operator=(socket&& other) noexcept;
 
+    int native_handle() const noexcept { return fd_; }
     bool is_valid() const noexcept { return fd_ >= 0; }
 
     bool bind(std::uint32_t addr, std::uint16_t port);

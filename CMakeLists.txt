@@ -75,6 +75,11 @@ add_subdirectory(networking)
 add_subdirectory(protocol)
 add_subdirectory(os_internals)
 
+add_library(workspace src/workspace.cpp)
+target_include_directories(workspace PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(workspace PUBLIC protocol)
+configure_file(nvim/sync.lua ${CMAKE_CURRENT_BINARY_DIR}/sync.lua COPYONLY)
+
 add_executable(janisnvim
     src/server.cpp
 )
@@ -84,6 +89,7 @@ target_link_libraries(janisnvim
         networking
         protocol
         os
+        workspace
 )
 
 add_executable(janisnvimdaemon
@@ -95,7 +101,10 @@ target_link_libraries(janisnvimdaemon
         networking
         protocol
         os
+        workspace
 )
+
+target_compile_definitions(janisnvimdaemon PRIVATE JANISNVIM_LUA="${CMAKE_CURRENT_BINARY_DIR}/sync.lua")
 
 include(CTest)
 if(BUILD_TESTING)
