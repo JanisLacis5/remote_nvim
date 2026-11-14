@@ -1,16 +1,6 @@
-if(PLATFORM STREQUAL "windows")
-    set(PLATFORM_SOCKET_SOURCE
-        ${PROJECT_SOURCE_DIR}/platform/windows/socket.c
-    )
-else()
-    set(PLATFORM_SOCKET_SOURCE
-        ${PROJECT_SOURCE_DIR}/platform/posix/socket.c
-    )
-endif()
-
 add_library(networking
     src/listener.c
-    ${PLATFORM_SOCKET_SOURCE}
+    ${PROJECT_SOURCE_DIR}/platform/posix/socket.c
 )
 
 target_link_libraries(networking

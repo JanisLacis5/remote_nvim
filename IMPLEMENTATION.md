@@ -8,7 +8,7 @@ The executables now implement **local file editing with asynchronous saved-file 
 Remote LSP, search, builds and other project-aware plugin integrations remain unimplemented.
 Only the requested file is transferred. There is no remote editor process.
 
-Build on both machines (CMake 3.28+, a C++23 compiler):
+Build on both machines (CMake 3.28+, a C17 compiler; tests also need C++23):
 
 ```sh
 cmake -S . -B build/linux/debug -DCMAKE_BUILD_TYPE=Debug
@@ -16,7 +16,9 @@ cmake --build build/linux/debug --parallel
 ctest --test-dir build/linux/debug --output-on-failure --parallel 4
 ```
 
-Google Test is fetched when tests are enabled; `-DBUILD_TESTING=OFF` builds only the applications.
+Google Test is fetched when tests are enabled; `-DBUILD_TESTING=OFF` builds only the applications
+and does not require a C++ compiler. Production code uses C17 and Linux APIs. The Neovim
+save hook remains Lua; C++ adapters under `tests/compat` let the existing tests call the C APIs.
 The local machine also needs Neovim and Kitty. Keep `sync.lua` beside the built binaries in their
 build directory: its configured absolute path is compiled into the daemon. Installation/relocation
 is not yet provided. `JANISNVIM_TERMINAL` can name a different launcher executable which accepts

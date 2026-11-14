@@ -7,20 +7,22 @@
 #include <sys/xattr.h>
 #include <unistd.h>
 
-bool ws_fail(const char **error, const char *message) {
+bool ws_fail(const char** error, const char* message) {
     if (error)
         *error = message;
+
     return false;
 }
 
-char *ws_join(const char *parent, const char *name) {
-    char *result = NULL;
+char* ws_join(const char* parent, const char* name) {
+    char* result = NULL;
     if (asprintf(&result, "%s%s%s", parent, parent[0] && parent[strlen(parent) - 1] == '/' ? "" : "/", name) < 0)
         return NULL;
+
     return result;
 }
 
-static bool same(const struct stat *a, const struct stat *b) {
+static bool same(const struct stat* a, const struct stat* b) {
     return a->st_dev == b->st_dev && a->st_ino == b->st_ino && a->st_size == b->st_size &&
            a->st_mtim.tv_sec == b->st_mtim.tv_sec && a->st_mtim.tv_nsec == b->st_mtim.tv_nsec &&
            a->st_ctim.tv_sec == b->st_ctim.tv_sec && a->st_ctim.tv_nsec == b->st_ctim.tv_nsec;
@@ -30,15 +32,15 @@ static bool equal(struct field a, struct field b) {
     return a.size == b.size && (!a.size || memcmp(a.data, b.data, a.size) == 0);
 }
 
-void ws_snapshot_clear(struct snapshot *snapshot) {
+void ws_snapshot_clear(struct snapshot* snapshot) {
     free(snapshot->content.data);
     *snapshot = (struct snapshot){ 0 };
 }
 
-bool ws_read(const char *path, struct snapshot *result, const char **error) {
+bool ws_read(const char* path, struct snapshot* result, const char** error) {
     *result = (struct snapshot){ 0 };
     int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
-    const char *failure = "cannot open file";
+    const char* failure = "cannot open file";
     if (fd < 0)
         goto fail;
 
@@ -74,7 +76,7 @@ bool ws_read(const char *path, struct snapshot *result, const char **error) {
 
         size_t size = result->content.size + (size_t)count;
         if (size > capacity) {
-            char *data = realloc(result->content.data, size + 1);
+            char* data = realloc(result->content.data, size + 1);
             failure = "out of memory";
             if (!data)
                 goto fail;
@@ -103,12 +105,12 @@ fail:
     return ws_fail(error, failure);
 }
 
-static char *parent_directory(const char *path) {
-    char *parent = strdup(path);
+static char* parent_directory(const char* path) {
+    char* parent = strdup(path);
     if (!parent)
         return NULL;
 
-    char *slash = strrchr(parent, '/');
+    char* slash = strrchr(parent, '/');
     if (!slash) {
         free(parent);
         return strdup(".");
@@ -118,7 +120,7 @@ static char *parent_directory(const char *path) {
     return parent;
 }
 
-static bool persist_directory(const char *parent, const char **error) {
+static bool persist_directory(const char* parent, const char** error) {
     int fd = open(parent, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (fd < 0)
         return ws_fail(error, "cannot open directory; save outcome uncertain");
@@ -128,7 +130,7 @@ static bool persist_directory(const char *parent, const char **error) {
     return result == 0 || ws_fail(error, "cannot persist directory; save outcome uncertain");
 }
 
-static bool write_content(int fd, struct field content, const char **error) {
+static bool write_content(int fd, struct field content, const char** error) {
     size_t offset = 0;
     while (offset < content.size) {
         ssize_t count = write(fd, content.data + offset, content.size - offset);
@@ -144,12 +146,12 @@ static bool write_content(int fd, struct field content, const char **error) {
 }
 
 /* A baseline requests conflict checks and preservation of ordinary ownership/mode. */
-static bool replace(const char *path, struct field content, unsigned mode, struct snapshot *baseline,
-                    const char **error) {
+static bool replace(const char* path, struct field content, unsigned mode, struct snapshot* baseline,
+                    const char** error) {
     bool ok = false;
     int fd = -1;
-    char *parent = parent_directory(path);
-    char *temp = parent ? ws_join(parent, ".janisnvim-XXXXXX") : NULL;
+    char* parent = parent_directory(path);
+    char* temp = parent ? ws_join(parent, ".janisnvim-XXXXXX") : NULL;
     struct snapshot current = { 0 }, rechecked = { 0 }, updated = { 0 };
     if (!temp) {
         ws_fail(error, "out of memory");
@@ -166,9 +168,11 @@ static bool replace(const char *path, struct field content, unsigned mode, struc
 
         if (current.info.st_uid != geteuid() || current.info.st_nlink != 1 || (current.info.st_mode & 07000) ||
             listxattr(path, NULL, 0) != 0) {
-            ws_fail(error, "safe replacement requires an owned, single-link file without special bits or extended attributes");
+            ws_fail(error,
+                    "safe replacement requires an owned, single-link file without special bits or extended attributes");
             goto out;
         }
+
         mode = current.info.st_mode & 0777;
     }
 
@@ -219,6 +223,7 @@ static bool replace(const char *path, struct field content, unsigned mode, struc
         *baseline = updated;
         updated = (struct snapshot){ 0 };
     }
+
     ok = true;
 
 out:
@@ -234,15 +239,15 @@ out:
     return ok;
 }
 
-bool ws_atomic_write(const char *path, struct field content, unsigned mode, const char **error) {
+bool ws_atomic_write(const char* path, struct field content, unsigned mode, const char** error) {
     return replace(path, content, mode, NULL, error);
 }
 
-bool ws_sync(const char *path, struct snapshot *baseline, struct field content, const char **error) {
+bool ws_sync(const char* path, struct snapshot* baseline, struct field content, const char** error) {
     return replace(path, content, 0, baseline, error);
 }
 
-bool ws_private_directory(const char *path, const char **error) {
+bool ws_private_directory(const char* path, const char** error) {
     if (mkdir(path, 0700) < 0 && errno != EEXIST)
         return ws_fail(error, "cannot create cache directory");
 
@@ -252,15 +257,15 @@ bool ws_private_directory(const char *path, const char **error) {
     return true;
 }
 
-bool ws_absolute_path(const char *path) {
+bool ws_absolute_path(const char* path) {
     if (!path || path[0] != '/')
         return false;
     if (!path[1])
         return true;
 
-    const char *part = path + 1;
+    const char* part = path + 1;
     while (*part) {
-        const char *end = strchr(part, '/');
+        const char* end = strchr(part, '/');
         size_t size = end ? (size_t)(end - part) : strlen(part);
         if (!size || (size == 1 && part[0] == '.') || (size == 2 && part[0] == '.' && part[1] == '.'))
             return false;
@@ -268,24 +273,27 @@ bool ws_absolute_path(const char *path) {
             return true;
         part = end + 1;
     }
+
     return false;
 }
 
-static bool inside(const char *directory, const char *path) {
+static bool inside(const char* directory, const char* path) {
     size_t length = strlen(directory);
     return !strncmp(directory, path, length) && (length == 1 || path[length] == '/' || path[length] == '\0');
 }
 
-char *ws_cache_entry(const char *root, const char *host, const char *directory, const char *path, const char **error) {
-    if (!host[0] || strlen(host) > 128 || !ws_absolute_path(directory) || !ws_absolute_path(path) || !inside(directory, path)) {
+char* ws_cache_entry(const char* root, const char* host, const char* directory, const char* path, const char** error) {
+    if (!host[0] || strlen(host) > 128 || !ws_absolute_path(directory) || !ws_absolute_path(path) ||
+        !inside(directory, path)) {
         ws_fail(error, "invalid remote identity or file outside workspace");
         return NULL;
     }
 
-    char *identity = NULL;
-    if (asprintf(&identity, "%zu:%s%zu:%s%zu:%s", strlen(host), host, strlen(directory), directory, strlen(path), path) < 0)
+    char* identity = NULL;
+    if (asprintf(&identity, "%zu:%s%zu:%s%zu:%s", strlen(host), host, strlen(directory), directory, strlen(path),
+                 path) < 0)
         identity = NULL;
-    char *result = strdup(root);
+    char* result = strdup(root);
     if (!identity || !result) {
         ws_fail(error, "out of memory");
         goto fail;
@@ -306,7 +314,7 @@ char *ws_cache_entry(const char *root, const char *host, const char *directory, 
         chunk[count * 2] = '\0';
         offset += count;
 
-        char *next = ws_join(result, chunk);
+        char* next = ws_join(result, chunk);
         if (!next) {
             ws_fail(error, "out of memory");
             goto fail;
@@ -317,7 +325,7 @@ char *ws_cache_entry(const char *root, const char *host, const char *directory, 
             goto fail;
     }
 
-    char *entry = ws_join(result, "entry");
+    char* entry = ws_join(result, "entry");
     if (!entry) {
         ws_fail(error, "out of memory");
         goto fail;
@@ -336,9 +344,9 @@ fail:
     return NULL;
 }
 
-bool ws_prepare_cache(const char *entry, const char *file, struct field remote, const char **error) {
+bool ws_prepare_cache(const char* entry, const char* file, struct field remote, const char** error) {
     bool ok = false;
-    char *base = ws_join(entry, "base");
+    char* base = ws_join(entry, "base");
     struct snapshot local = { 0 }, previous = { 0 };
     struct stat info;
     if (!base)

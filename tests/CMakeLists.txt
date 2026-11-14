@@ -12,6 +12,7 @@ FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 function(add_remote_nvim_tests target label)
     add_executable(${target} ${ARGN})
+    target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/compat)
     target_link_libraries(${target} PRIVATE GTest::gtest_main protocol os)
     gtest_discover_tests(${target}
         DISCOVERY_MODE PRE_TEST
@@ -36,6 +37,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND PLATFORM STREQUAL "linux")
     target_compile_definitions(process_tests PRIVATE
         PROCESS_TEST_HELPER="$<TARGET_FILE:process_test_helper>"
     )
+
+    add_remote_nvim_tests(c_api_tests unit c_api_test.cpp)
+    target_link_libraries(c_api_tests PRIVATE workspace)
 
     add_remote_nvim_tests(workspace_tests unit workspace_test.cpp)
     target_link_libraries(workspace_tests PRIVATE workspace)

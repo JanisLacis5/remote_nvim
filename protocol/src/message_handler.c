@@ -2,18 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct field field_string(const char *text) {
-    return (struct field){ (char *)text, strlen(text) };
+struct field field_string(const char* text) {
+    return (struct field){ (char*)text, strlen(text) };
 }
 
-void message_clear(struct message *message) {
+void message_clear(struct message* message) {
     for (size_t i = 0; i < message->count; ++i)
         free(message->fields[i].data);
 
     *message = (struct message){ 0 };
 }
 
-bool message_read(int fd, struct message *message) {
+bool message_read(int fd, struct message* message) {
     unsigned char header[6];
     *message = (struct message){ 0 };
 
@@ -31,7 +31,7 @@ bool message_read(int fd, struct message *message) {
         if (size > MAX_FIELD_SIZE)
             goto fail;
 
-        char *data = malloc((size_t)size + 1);
+        char* data = malloc((size_t)size + 1);
         if (!data)
             goto fail;
 
@@ -49,7 +49,7 @@ fail:
     return false;
 }
 
-bool message_write(int fd, const struct message *message) {
+bool message_write(int fd, const struct message* message) {
     if (message->count > 4 || message->type < MSG_OPEN || message->type > MSG_AUTHENTICATE)
         return false;
 
@@ -62,9 +62,10 @@ bool message_write(int fd, const struct message *message) {
         return false;
 
     for (size_t i = 0; i < message->count; ++i) {
-        const struct field *field = &message->fields[i];
+        const struct field* field = &message->fields[i];
         uint32_t size = htonl((uint32_t)field->size);
-        if (net_write(fd, &size, sizeof(size)) != sizeof(size) || net_write(fd, field->data, field->size) != field->size)
+        if (net_write(fd, &size, sizeof(size)) != sizeof(size) ||
+            net_write(fd, field->data, field->size) != field->size)
             return false;
     }
 

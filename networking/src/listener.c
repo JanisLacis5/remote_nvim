@@ -20,7 +20,7 @@ int net_listen(uint16_t port) {
 uint16_t net_listener_port(int fd) {
     struct sockaddr_in addr = { 0 };
     socklen_t size = sizeof(addr);
-    if (getsockname(fd, (struct sockaddr *)&addr, &size) < 0)
+    if (getsockname(fd, (struct sockaddr*)&addr, &size) < 0)
         return 0;
 
     return ntohs(addr.sin_port);

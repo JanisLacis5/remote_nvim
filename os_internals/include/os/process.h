@@ -6,13 +6,16 @@
 extern "C" {
 #endif
 
-struct child_process { pid_t pid; int status; };
+struct child_process {
+    pid_t pid;
+    int status;
+};
 /* argv is NULL-terminated. A successful spawn owns a child until wait/reap. */
-bool process_spawn(struct child_process *child, char *const argv[]);
-bool process_running(struct child_process *child);
-int process_wait(struct child_process *child);
+bool process_spawn(struct child_process* child, char* const argv[]);
+bool process_running(struct child_process* child);
+int process_wait(struct child_process* child);
 /* Caller frees the returned directory. */
-char *process_cwd(const struct child_process *child);
+char* process_cwd(const struct child_process* child);
 
 #ifdef __cplusplus
 }

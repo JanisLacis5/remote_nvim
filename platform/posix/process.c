@@ -5,7 +5,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-bool process_spawn(struct child_process *child, char *const argv[]) {
+bool process_spawn(struct child_process* child, char* const argv[]) {
     *child = (struct child_process){ -1, -1 };
     if (!argv || !argv[0] || !argv[0][0]) {
         errno = EINVAL;
@@ -24,7 +24,7 @@ bool process_spawn(struct child_process *child, char *const argv[]) {
     return true;
 }
 
-static bool reap(struct child_process *child, int options) {
+static bool reap(struct child_process* child, int options) {
     if (child->pid < 0)
         return false;
 
@@ -42,16 +42,16 @@ static bool reap(struct child_process *child, int options) {
     return false;
 }
 
-bool process_running(struct child_process *child) {
+bool process_running(struct child_process* child) {
     return reap(child, WNOHANG);
 }
 
-int process_wait(struct child_process *child) {
+int process_wait(struct child_process* child) {
     reap(child, 0);
     return child->status;
 }
 
-char *process_cwd(const struct child_process *child) {
+char* process_cwd(const struct child_process* child) {
     char path[64];
     snprintf(path, sizeof(path), "/proc/%ld/cwd", (long)child->pid);
     return realpath(path, NULL);

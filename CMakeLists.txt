@@ -1,14 +1,12 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(janisnvim LANGUAGES C CXX)
+project(janisnvim LANGUAGES C)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 add_compile_definitions(_GNU_SOURCE)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(PLATFORM "" CACHE STRING "Target platform: linux, mac, or windows")
@@ -39,6 +37,10 @@ endif()
 
 message(STATUS "Target platform: ${PLATFORM}")
 
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT PLATFORM STREQUAL "linux")
+    message(FATAL_ERROR "Remote Nvim currently requires Linux")
+endif()
+
 set(SANITIZER "none" CACHE STRING "Sanitizer for Debug builds: none, address, thread")
 set_property(CACHE SANITIZER PROPERTY STRINGS none address thread)
 
@@ -64,8 +66,10 @@ endif ()
 
 set(CLANG_FORMAT_BIN "/usr/bin/clang-format-20")
 file(GLOB_RECURSE FORMAT_FILES CONFIGURE_DEPENDS
-    "${PROJECT_SOURCE_DIR}/*.cpp"
-    "${PROJECT_SOURCE_DIR}/*.hpp"
+    "${PROJECT_SOURCE_DIR}/*.c"
+    "${PROJECT_SOURCE_DIR}/*.h"
+    "${PROJECT_SOURCE_DIR}/tests/*.cpp"
+    "${PROJECT_SOURCE_DIR}/tests/*.hpp"
 )
 list(FILTER FORMAT_FILES EXCLUDE REGEX "^${PROJECT_SOURCE_DIR}/build/")
 
@@ -85,7 +89,7 @@ target_link_libraries(workspace PUBLIC protocol)
 configure_file(nvim/sync.lua ${CMAKE_CURRENT_BINARY_DIR}/sync.lua COPYONLY)
 
 add_executable(janisnvim
-    src/server.cpp
+    src/server.c
 )
 
 target_link_libraries(janisnvim
@@ -97,7 +101,7 @@ target_link_libraries(janisnvim
 )
 
 add_executable(janisnvimdaemon
-    src/client.cpp
+    src/client.c
 )
 
 target_link_libraries(janisnvimdaemon
@@ -112,5 +116,9 @@ target_compile_definitions(janisnvimdaemon PRIVATE JANISNVIM_LUA="${CMAKE_CURREN
 
 include(CTest)
 if(BUILD_TESTING)
+    enable_language(CXX)
+    set(CMAKE_CXX_STANDARD 23)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)
     add_subdirectory(tests)
 endif()

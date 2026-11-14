@@ -10,6 +10,8 @@ Use `-DSANITIZER=address` for AddressSanitizer. Google Test 1.17.0 is fetched wi
 pinned checksum; offline builds can set `FETCHCONTENT_SOURCE_DIR_GOOGLETEST` to an
 existing source directory. `-DBUILD_TESTING=OFF` omits tests.
 
+- `c_api_test.cpp`: C ownership cleanup on truncated frames and failed reads, text validation,
+  and repeated process polling/waits.
 - `protocol_test.cpp`: independent wire fixtures, field bounds and malformed headers.
 - `message_handler_test.cpp`: fragmentation, stream boundaries, truncated transfers,
   large and empty files, and disconnect handling.
@@ -27,6 +29,10 @@ Tests require Linux local sockets. `FileWorkflow` is added only when Python 3 an
 are available, runs serially, and requires free loopback ports 7777/7778. Other tests use
 socketpairs or ephemeral ports. Run without a production daemon on those ports. A socket
 sandbox requires granting the test process local socket access.
+
+The C++ tests retain their existing assertions through adapters in `compat/`. These adapters
+only translate values and ownership; socket I/O, framing, child management and filesystem
+operations execute in the C production libraries. Production builds do not include the adapters.
 
 CTest labels are `unit` and `integration`. Individual C++ tests have a 15-second timeout;
 the complete file workflow has a 90-second timeout. Use `-R '^Workspace\.'` or
