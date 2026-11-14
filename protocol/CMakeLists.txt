@@ -1,5 +1,5 @@
 add_library(protocol
-    src/message_handler.cpp
+    src/message_handler.c
 )
 
 target_link_libraries(protocol

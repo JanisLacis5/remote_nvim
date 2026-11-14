@@ -1,15 +1,14 @@
 if(PLATFORM STREQUAL "windows")
     set(PLATFORM_SOCKET_SOURCE
-        ${PROJECT_SOURCE_DIR}/platform/windows/process.cpp
+        ${PROJECT_SOURCE_DIR}/platform/windows/process.c
     )
 else()
     set(PLATFORM_SOCKET_SOURCE
-        ${PROJECT_SOURCE_DIR}/platform/posix/process.cpp
+        ${PROJECT_SOURCE_DIR}/platform/posix/process.c
     )
 endif()
 
 add_library(os
-    src/process.cpp
     ${PLATFORM_SOCKET_SOURCE}
 )
 

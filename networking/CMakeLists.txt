@@ -1,16 +1,15 @@
 if(PLATFORM STREQUAL "windows")
     set(PLATFORM_SOCKET_SOURCE
-        ${PROJECT_SOURCE_DIR}/platform/windows/socket.cpp
+        ${PROJECT_SOURCE_DIR}/platform/windows/socket.c
     )
 else()
     set(PLATFORM_SOCKET_SOURCE
-        ${PROJECT_SOURCE_DIR}/platform/posix/socket.cpp
+        ${PROJECT_SOURCE_DIR}/platform/posix/socket.c
     )
 endif()
 
 add_library(networking
-    src/socket.cpp
-    src/listener.cpp
+    src/listener.c
     ${PLATFORM_SOCKET_SOURCE}
 )
 

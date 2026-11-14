@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(janisnvim LANGUAGES CXX)
+project(janisnvim LANGUAGES C CXX)
+
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+add_compile_definitions(_GNU_SOURCE)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -1,36 +1,34 @@
-#ifndef LISTENER_H
-#define LISTENER_H
-
+#ifndef TEST_LISTENER_HPP
+#define TEST_LISTENER_HPP
+#include "networking/listener.h"
 #include "networking/socket.hpp"
 #include <optional>
-
-namespace networking
-{
-
-class listener
-{
+#include <unistd.h>
+namespace networking {
+class listener {
 public:
-    // Port zero asks the OS to choose a free loopback port.
-    explicit listener(std::uint16_t port = 7777);
-    ~listener();
+    explicit listener(uint16_t port = 7777) : fd_(net_listen(port)) {}
+    ~listener() { if (fd_ >= 0) ::close(fd_); }
+    listener(const listener&) = delete;
+    listener& operator=(const listener&) = delete;
+    listener(listener&& other) noexcept : fd_(std::exchange(other.fd_, -1)) {}
+    listener& operator=(listener&& other) noexcept {
+        if (this != &other) {
+            if (fd_ >= 0) ::close(fd_);
+            fd_ = std::exchange(other.fd_, -1);
+        }
+        return *this;
+    }
 
-    listener(listener& other) = delete;
-    listener operator=(listener& other) = delete;
-    listener(listener&& other) noexcept;
-    listener& operator=(listener&& other) noexcept;
-
-    bool is_valid() const noexcept { return fd_ >= 0; }
-    std::uint16_t port() const noexcept;
-    std::optional<networking::socket> accept();
-
+    bool is_valid() const { return fd_ >= 0; }
+    uint16_t port() const { return net_listener_port(fd_); }
+    std::optional<socket> accept() {
+        auto value = net_accept(fd_);
+        if (value.fd < 0) return {};
+        return socket(value.fd);
+    }
 private:
-    static constexpr int LISTEN_BACKLOG = 10;
-
-    int fd_{ -1 };
-
-    void close();
+    int fd_;
 };
-
-} // namespace networking
-
+}
 #endif
