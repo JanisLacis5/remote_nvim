@@ -79,7 +79,7 @@ add_subdirectory(networking)
 add_subdirectory(protocol)
 add_subdirectory(os_internals)
 
-add_library(workspace src/workspace.cpp)
+add_library(workspace src/workspace.c)
 target_include_directories(workspace PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(workspace PUBLIC protocol)
 configure_file(nvim/sync.lua ${CMAKE_CURRENT_BINARY_DIR}/sync.lua COPYONLY)
